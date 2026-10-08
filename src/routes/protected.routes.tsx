@@ -1,7 +1,10 @@
-const ProtectedRoute = ({ children, allowedRoles = [] }) => {
-    console.log(allowedRoles);
+import type { ReactNode } from "react";
 
-    return <>{children}</>;
-};
+interface ProtectedRouteProps {
+  children: ReactNode;
+  allowedRoles?: string[];
+}
 
-export default ProtectedRoute;
+export default function ProtectedRoute({ children }: ProtectedRouteProps) {
+  return <>{children}</>;
+}

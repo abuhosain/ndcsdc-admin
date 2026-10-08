@@ -1,64 +1,82 @@
 import { createBrowserRouter, Navigate } from "react-router";
 import App from "../App";
 import Login from "../pages/public/Login";
-import SignUp from "../pages/public/SignUp";
-import Unauthorized from "../pages/public/Unauthorized";
 import NotFoundPage from "../pages/public/NotFoundPage";
 import ProtectedRoute from "./protected.routes";
-import DashboardPage from "../pages/dashboard/DashboardPage";
-import ProjectsPage from "../pages/dashboard/ProjectsPage/ProjectsPage";
-import ExperiencesPage from "../pages/dashboard/ExperiencesPage/ExperiencesPage";
+import DashboardOverviewPage from "../pages/dashboard/DashboardOverviewPage";
+import RegistrationsPage from "../pages/dashboard/RegistrationsPage";
+import SummitManagementPage from "../pages/dashboard/SummitManagementPage";
+import ActivitiesAdminPage from "../pages/dashboard/ActivitiesAdminPage";
+import GalleryAdminPage from "../pages/dashboard/GalleryAdminPage";
+import TeamAdminPage from "../pages/dashboard/TeamAdminPage";
+import PartnersAdminPage from "../pages/dashboard/PartnersAdminPage";
+import MessagesAdminPage from "../pages/dashboard/MessagesAdminPage";
+import SiteSettingsAdminPage from "../pages/dashboard/SiteSettingsAdminPage";
+import UsersAuditAdminPage from "../pages/dashboard/UsersAuditAdminPage";
 
 const router = createBrowserRouter([
-    {
-        path: "/",
-        element: <Navigate to="/login" replace />,
-    },
-    {
+  {
+    path: "/",
+    element: <Navigate to="/dashboard" replace />,
+  },
+  {
+    path: "/dashboard",
+    element: (
+      <ProtectedRoute allowedRoles={["SUPER_ADMIN", "EDITOR"]}>
+        <App />
+      </ProtectedRoute>
+    ),
+    children: [
+      {
         path: "/dashboard",
-        element: (
-            <ProtectedRoute allowedRoles={["super_admin",]}>
-                <App />
-            </ProtectedRoute>
-        ),
-
-        //protected dashboard routes here
-        children: [
-            {
-                path: "/dashboard",
-                element: <DashboardPage />,
-            },
-            {
-                path: "/dashboard/projects",
-                element: <ProjectsPage />,
-            },
-            {
-                path: "/dashboard/experiences",
-                element: <ExperiencesPage />,
-            },
-        ],
-    },
-    {
-        path: "/login",
-        element: <Login />,
-    },
-
-    {
-        path: "/signup",
-        element: <SignUp />,
-    },
-
-    // unauthorized page
-    {
-        path: "/unauthorized",
-        element: <Unauthorized />,
-    },
-
-    // not found page
-    {
-        path: "*",
-        element: <NotFoundPage />,
-    },
+        element: <DashboardOverviewPage />,
+      },
+      {
+        path: "/dashboard/registrations",
+        element: <RegistrationsPage />,
+      },
+      {
+        path: "/dashboard/summit",
+        element: <SummitManagementPage />,
+      },
+      {
+        path: "/dashboard/activities",
+        element: <ActivitiesAdminPage />,
+      },
+      {
+        path: "/dashboard/gallery",
+        element: <GalleryAdminPage />,
+      },
+      {
+        path: "/dashboard/team",
+        element: <TeamAdminPage />,
+      },
+      {
+        path: "/dashboard/partners",
+        element: <PartnersAdminPage />,
+      },
+      {
+        path: "/dashboard/messages",
+        element: <MessagesAdminPage />,
+      },
+      {
+        path: "/dashboard/settings",
+        element: <SiteSettingsAdminPage />,
+      },
+      {
+        path: "/dashboard/users",
+        element: <UsersAuditAdminPage />,
+      },
+    ],
+  },
+  {
+    path: "/login",
+    element: <Login />,
+  },
+  {
+    path: "*",
+    element: <NotFoundPage />,
+  },
 ]);
 
 export default router;

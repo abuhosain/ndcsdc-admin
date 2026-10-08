@@ -1,74 +1,88 @@
-import { ConfigProvider, Layout, theme } from "antd";
+import { useState } from "react";
+import { Layout } from "antd";
 import { Outlet, useLocation } from "react-router";
-
-import { useEffect, useState } from "react";
 import Sidebar from "./Sidebar";
+import { Calendar } from "lucide-react";
 
-const { Content } = Layout;
+const { Header, Content } = Layout;
 
-const MainLayout = () => {
-    const [minimizeSidebar, setMinimizeSidebar] = useState(false);
-    const [openKeys, setOpenKeys] = useState<string[]>([]);
-    const path = useLocation();
-    const pathname = path.pathname;
+export default function MainLayout() {
+  const [minimizeSidebar, setMinimizeSidebar] = useState(false);
+  const location = useLocation();
 
-    const onOpenChange = (keys: string[]) => {
-        const latest = keys.find((key) => !openKeys.includes(key));
-        setOpenKeys(latest ? [latest] : []);
-    };
+  const getPageTitle = (path: string) => {
+    switch (path) {
+      case "/dashboard":
+        return "Dashboard Overview";
+      case "/dashboard/registrations":
+        return "Student Registrations Roster";
+      case "/dashboard/summit":
+        return "NACS 2026 Summit Management";
+      case "/dashboard/activities":
+        return "Club Activities & Events";
+      case "/dashboard/gallery":
+        return "Photo Gallery & Albums";
+      case "/dashboard/team":
+        return "Executive Panel & Moderator";
+      case "/dashboard/partners":
+        return "Partners & Sponsors";
+      case "/dashboard/messages":
+        return "Secretariat Messages Inbox";
+      case "/dashboard/settings":
+        return "Global Site & Event Settings";
+      case "/dashboard/users":
+        return "Admin Users & Audit Logs";
+      default:
+        return "NDCSDC Administration";
+    }
+  };
 
-    useEffect(() => {
-        if (window.innerWidth < 768) {
-            setMinimizeSidebar(true);
-        }
-    }, [pathname]);
+  return (
+    <Layout className="min-h-screen bg-[#F5F1E6]">
+      <Sidebar
+        minimizeSidebar={minimizeSidebar}
+        setMinimizeSidebar={setMinimizeSidebar}
+      />
 
-    useEffect(() => {
-        if (minimizeSidebar) {
-            setOpenKeys([]);
-        }
-    }, [minimizeSidebar]);
+      <Layout className="bg-[#F5F1E6]">
+        {/* Top Header */}
+        <Header
+          style={{ background: "#FFFFFF", padding: "0 24px" }}
+          className="border-b border-[#D5CEBC] flex items-center justify-between h-16 sticky top-0 z-40 shadow-xs"
+        >
+          <div>
+            <h1 className="font-display font-extrabold text-base sm:text-lg uppercase text-[#1A1614] m-0">
+              {getPageTitle(location.pathname)}
+            </h1>
+          </div>
 
-    return (
-        <Layout className="h-screen bg-slate-950 text-slate-100 font-sans">
-            <ConfigProvider
-                theme={{
-                    algorithm: theme.darkAlgorithm,
-                    token: {
-                        fontFamily: '"Lexend", sans-serif',
-                        colorPrimary: "#6366f1",
-                        colorBgBase: "#020617",
-                        colorBgContainer: "#0f172a",
-                    },
-                    components: {
-                        Menu: {
-                            darkItemSelectedBg: "rgba(99, 102, 241, 0.15)",
-                            darkItemSelectedColor: "#818cf8",
-                            darkItemColor: "#94a3b8",
-                            darkItemHoverColor: "#f8fafc",
-                            darkItemHoverBg: "rgba(30, 41, 59, 0.7)",
-                            itemMarginInline: 8,
-                            itemBorderRadius: 10,
-                        },
-                    },
-                }}>
+          <div className="flex items-center gap-4">
+            <div className="hidden sm:flex items-center gap-2 px-3 py-1 bg-[#EFEADB] text-[#1A1614] rounded-md border border-[#D5CEBC] text-xs font-semibold">
+              <Calendar className="w-3.5 h-3.5 text-[#A81818]" />
+              <span>NACS 2026: 14 Nov 2026</span>
+            </div>
 
-                <Sidebar minimizeSidebar={minimizeSidebar} setMinimizeSidebar={setMinimizeSidebar} openKeys={openKeys} onOpenChange={onOpenChange} />
+            <div className="flex items-center gap-2 pl-3 border-l border-[#D5CEBC]">
+              <div className="w-8 h-8 rounded-full bg-[#1A1614] text-[#F5EFE0] font-display font-bold text-xs flex items-center justify-center">
+                SA
+              </div>
+              <div className="hidden md:flex flex-col text-left">
+                <span className="text-xs font-bold text-[#1A1614] leading-tight">
+                  Super Admin
+                </span>
+                <span className="text-[10px] text-[#6E685E] leading-tight">
+                  NDCSDC Moderator
+                </span>
+              </div>
+            </div>
+          </div>
+        </Header>
 
-                <Layout className="overflow-hidden bg-slate-950 bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(120,119,198,0.12),rgba(255,255,255,0))]">
-                    <Content className="overflow-y-auto">
-                        <div
-                            style={{
-                                padding: "28px",
-                                minHeight: 360,
-                            }}>
-                            <Outlet />
-                        </div>
-                    </Content>
-                </Layout>
-            </ConfigProvider>
-        </Layout>
-    );
-};
-
-export default MainLayout;
+        {/* Content Area */}
+        <Content className="p-4 sm:p-6 lg:p-8 overflow-y-auto max-w-[1400px] w-full mx-auto">
+          <Outlet />
+        </Content>
+      </Layout>
+    </Layout>
+  );
+}

@@ -6,17 +6,21 @@ import { Toaster } from "sonner";
 import { ConfigProvider } from "antd";
 import "./index.css";
 
-createRoot(document.getElementById("root")).render(
+const rootElement = document.getElementById("root");
+if (!rootElement) throw new Error("Root element not found");
+
+createRoot(rootElement).render(
   <StrictMode>
     <ConfigProvider
       theme={{
         token: {
-          fontFamily: '"Lexend", sans-serif',
+          colorPrimary: "#A81818",
+          fontFamily: '"Poppins", "Inter", sans-serif',
         },
       }}
     >
       <RouterProvider router={router} />
-      <Toaster position="bottom-right" richColors />
+      <Toaster position="top-right" richColors />
     </ConfigProvider>
   </StrictMode>
 );

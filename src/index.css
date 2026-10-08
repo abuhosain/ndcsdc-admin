@@ -1,43 +1,93 @@
 @import "tailwindcss";
 
 @theme {
-  --font-lexend: "Lexend", sans-serif;
+  --color-ink: #1A1614;
+  --color-ink-dark: #110E0C;
+  --color-ink-muted: #6E685E;
+  --color-ink-onDark: #F5EFE0;
+  
+  --color-brand: #A81818;
+  --color-brand-hover: #8F1313;
+  --color-brand-bright: #D91A1A;
+  --color-brand-gold: #E8C547;
+  
+  --color-canvas: #F5F1E6;
+  --color-surface-1: #EFEADB;
+  --color-surface-sand: #B8B09A;
+  --color-border: #D5CEBC;
+  
+  --font-display: "Poppins", system-ui, sans-serif;
+  --font-sans: "Inter", system-ui, sans-serif;
 }
 
-html,
-body,
-* {
-  font-family: "Lexend", sans-serif !important;
-  box-sizing: border-box;
-}
-
-html,
-body {
-  padding: 0;
+html, body {
+  background-color: #F5F1E6;
+  color: #1A1614;
+  font-family: var(--font-sans), -apple-system, sans-serif;
   margin: 0;
+  padding: 0;
 }
 
-/* Custom Modern Dark Scrollbar */
+h1, h2, h3, h4, .font-heading {
+  font-family: var(--font-display), sans-serif;
+  letter-spacing: -0.01em;
+}
+
+/* Custom Admin Scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: transparent;
+  background: #EFEADB;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #334155;
-  border-radius: 9999px;
+  background: #B9B29E;
+  border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #6366f1;
+  background: #A81818;
 }
 
-/* Firefox scrollbar */
-* {
-  scrollbar-width: thin;
-  scrollbar-color: #334155 transparent;
+/* Custom Ant Design Theme Overrides for NDCSDC */
+.ant-layout-sider {
+  background: #1A1614 !important;
+}
+
+.ant-menu-dark {
+  background: #1A1614 !important;
+}
+
+.ant-menu-dark .ant-menu-item-selected {
+  background-color: #A81818 !important;
+  color: #FFFFFF !important;
+  font-weight: 600;
+}
+
+.ant-table-wrapper .ant-table-thead > tr > th {
+  background: #EFEADB !important;
+  color: #1A1614 !important;
+  font-weight: 700 !important;
+  font-size: 12px !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.05em !important;
+  border-bottom: 1px solid #D5CEBC !important;
+}
+
+.ant-table-wrapper .ant-table-tbody > tr > td {
+  border-bottom: 1px solid #EFEADB !important;
+  font-size: 13px !important;
+}
+
+.ant-btn-primary {
+  background-color: #A81818 !important;
+  border-color: #A81818 !important;
+}
+
+.ant-btn-primary:hover {
+  background-color: #8F1313 !important;
+  border-color: #8F1313 !important;
 }
