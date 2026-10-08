@@ -97,12 +97,8 @@ export default function Sidebar({
       style={{
         backgroundColor: "#1A1614",
         height: "100vh",
-        position: "sticky",
-        top: 0,
-        left: 0,
-        zIndex: 50,
       }}
-      className="border-r border-neutral-800 bg-[#1A1614] h-screen shrink-0"
+      className="border-r border-neutral-800 bg-[#1A1614] h-screen shrink-0 overflow-hidden"
       width={260}
     >
       <div className="flex flex-col h-full overflow-hidden">

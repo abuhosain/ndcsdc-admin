@@ -1,10 +1,7 @@
 import { useState } from "react";
-import { Layout } from "antd";
 import { Outlet, useLocation } from "react-router";
 import Sidebar from "./Sidebar";
 import { Calendar } from "lucide-react";
-
-const { Header, Content } = Layout;
 
 export default function MainLayout() {
   const [minimizeSidebar, setMinimizeSidebar] = useState(false);
@@ -38,17 +35,18 @@ export default function MainLayout() {
   };
 
   return (
-    <Layout hasSider className="min-h-screen bg-[#F5F1E6]">
+    <div className="h-screen w-screen overflow-hidden flex bg-[#F5F1E6]">
+      {/* Pinned Left Sidebar */}
       <Sidebar
         minimizeSidebar={minimizeSidebar}
         setMinimizeSidebar={setMinimizeSidebar}
       />
 
-      <Layout className="bg-[#F5F1E6] min-h-screen min-w-0 flex-1 flex flex-col">
-        {/* Top Header */}
-        <Header
-          style={{ background: "#FFFFFF", padding: "0 24px" }}
-          className="border-b border-[#D5CEBC] flex items-center justify-between h-16 sticky top-0 z-40 shadow-xs"
+      {/* Pinned Right Area (Header + Scrollable Main Content) */}
+      <div className="flex-1 flex flex-col h-screen min-w-0 overflow-hidden bg-[#F5F1E6]">
+        {/* Pinned Top Header */}
+        <header
+          className="h-16 shrink-0 bg-white border-b border-[#D5CEBC] px-4 sm:px-6 flex items-center justify-between z-30 shadow-xs"
         >
           <div>
             <h1 className="font-display font-extrabold text-base sm:text-lg uppercase text-[#1A1614] m-0">
@@ -76,13 +74,15 @@ export default function MainLayout() {
               </div>
             </div>
           </div>
-        </Header>
+        </header>
 
-        {/* Content Area */}
-        <Content className="p-4 sm:p-6 lg:p-8 overflow-y-auto max-w-[1400px] w-full mx-auto">
-          <Outlet />
-        </Content>
-      </Layout>
-    </Layout>
+        {/* Scrollable Page Body (Only this area scrolls) */}
+        <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 sm:p-6 lg:p-8">
+          <div className="max-w-[1400px] w-full mx-auto">
+            <Outlet />
+          </div>
+        </main>
+      </div>
+    </div>
   );
 }
