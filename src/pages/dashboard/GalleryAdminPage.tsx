@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, Image as ImageIcon } from "lucide-react";
+import { Plus, Image as ImageIcon, Pencil, Trash2 } from "lucide-react";
 import { Modal } from "antd";
 import { toast } from "sonner";
 
@@ -22,26 +22,50 @@ export default function GalleryAdminPage() {
   const [photos, setPhotos] = useState<PhotoItem[]>(INITIAL_PHOTOS);
   const [selectedAlbum, setSelectedAlbum] = useState("ALL");
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingPhoto, setEditingPhoto] = useState<PhotoItem | null>(null);
+
   const [formState, setFormState] = useState({ album: "Study Fair 2025", title: "", caption: "" });
 
   const filteredPhotos = selectedAlbum === "ALL"
     ? photos
     : photos.filter((p) => p.album === selectedAlbum);
 
-  const handleAdd = (e: React.FormEvent) => {
+  const openAddModal = () => {
+    setEditingPhoto(null);
+    setFormState({ album: "Study Fair 2025", title: "", caption: "" });
+    setIsModalOpen(true);
+  };
+
+  const openEditModal = (p: PhotoItem) => {
+    setEditingPhoto(p);
+    setFormState({ album: p.album, title: p.title, caption: p.caption });
+    setIsModalOpen(true);
+  };
+
+  const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formState.title.trim()) return;
 
-    const newPhoto: PhotoItem = {
-      id: String(Date.now()),
-      ...formState,
-      uploadedAt: new Date().toISOString().slice(0, 10),
-    };
+    if (editingPhoto) {
+      setPhotos((prev) =>
+        prev.map((p) =>
+          p.id === editingPhoto.id
+            ? { ...p, album: formState.album, title: formState.title, caption: formState.caption }
+            : p
+        )
+      );
+      toast.success("Photo details updated.");
+    } else {
+      const newPhoto: PhotoItem = {
+        id: String(Date.now()),
+        ...formState,
+        uploadedAt: new Date().toISOString().slice(0, 10),
+      };
+      setPhotos([newPhoto, ...photos]);
+      toast.success("Photo added to gallery album.");
+    }
 
-    setPhotos([newPhoto, ...photos]);
     setIsModalOpen(false);
-    setFormState({ album: "Study Fair 2025", title: "", caption: "" });
-    toast.success("Photo added to gallery album.");
   };
 
   const handleDelete = (id: string) => {
@@ -64,7 +88,7 @@ export default function GalleryAdminPage() {
         </div>
 
         <button
-          onClick={() => setIsModalOpen(true)}
+          onClick={openAddModal}
           className="btn-primary text-xs uppercase tracking-wider py-2.5 px-5 font-bold inline-flex items-center gap-2 cursor-pointer self-start sm:self-center"
         >
           <Plus className="w-4 h-4" />
@@ -113,35 +137,45 @@ export default function GalleryAdminPage() {
 
             <div className="pt-3 border-t border-[#EFEADB] mt-4 flex items-center justify-between text-[10px] text-[#6E685E]">
               <span>{item.uploadedAt}</span>
-              <button
-                onClick={() => handleDelete(item.id)}
-                className="text-rose-700 hover:underline font-bold cursor-pointer"
-              >
-                Delete
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => openEditModal(item)}
+                  className="text-[#1A1614] hover:text-[#A81818] font-bold cursor-pointer"
+                  title="Edit Caption"
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  onClick={() => handleDelete(item.id)}
+                  className="text-rose-700 hover:text-rose-900 font-bold cursor-pointer"
+                  title="Delete Photo"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
             </div>
           </div>
         ))}
       </div>
 
-      {/* Upload Modal */}
+      {/* Add / Edit Photo Modal */}
       <Modal
         open={isModalOpen}
         onCancel={() => setIsModalOpen(false)}
         footer={null}
         title={
           <span className="font-display font-bold text-base uppercase text-[#1A1614]">
-            Upload to Gallery Album
+            {editingPhoto ? "Update Photo Information" : "Add Image to Gallery"}
           </span>
         }
       >
-        <form onSubmit={handleAdd} className="space-y-4 pt-2 text-xs">
+        <form onSubmit={handleSave} className="space-y-4 pt-2 text-xs">
           <div>
-            <label className="block font-bold text-[#1A1614] uppercase mb-1">Target Album</label>
+            <label className="block font-bold text-[#1A1614] uppercase mb-1">Album</label>
             <select
               value={formState.album}
               onChange={(e) => setFormState({ ...formState, album: e.target.value })}
-              className="w-full p-2.5 rounded border border-[#D5CEBC] bg-white text-xs font-semibold"
+              className="w-full p-2.5 rounded border border-[#D5CEBC] bg-white text-xs font-semibold cursor-pointer"
             >
               <option value="Study Fair 2025">Study Fair 2025</option>
               <option value="Workshops">Workshops</option>
@@ -150,14 +184,16 @@ export default function GalleryAdminPage() {
           </div>
 
           <div>
-            <label className="block font-bold text-[#1A1614] uppercase mb-1">Photo Title</label>
+            <label className="block font-bold text-[#1A1614] uppercase mb-1">
+              Photo Title <span className="text-[#A81818]">*</span>
+            </label>
             <input
               type="text"
               required
-              placeholder="e.g. Keynote Speech at Auditorium"
+              placeholder="e.g. Physics Problem Solving Circle"
               value={formState.title}
               onChange={(e) => setFormState({ ...formState, title: e.target.value })}
-              className="w-full p-2.5 rounded border border-[#D5CEBC] bg-[#F5F1E6] text-xs"
+              className="w-full p-2.5 rounded border border-[#D5CEBC] bg-[#F5F1E6] text-xs font-medium"
             />
           </div>
 
@@ -165,27 +201,26 @@ export default function GalleryAdminPage() {
             <label className="block font-bold text-[#1A1614] uppercase mb-1">Caption</label>
             <textarea
               rows={3}
-              required
-              placeholder="Brief caption describing the moment..."
+              placeholder="Description of the moment or people in the frame..."
               value={formState.caption}
               onChange={(e) => setFormState({ ...formState, caption: e.target.value })}
-              className="w-full p-2.5 rounded border border-[#D5CEBC] bg-[#F5F1E6] text-xs"
+              className="w-full p-2.5 rounded border border-[#D5CEBC] bg-[#F5F1E6] text-xs font-medium"
             ></textarea>
           </div>
 
-          <div className="pt-2 flex justify-end gap-2">
+          <div className="pt-3 border-t border-[#EFEADB] flex justify-end gap-2">
             <button
               type="button"
               onClick={() => setIsModalOpen(false)}
-              className="px-4 py-2 border border-[#D5CEBC] rounded text-xs font-bold uppercase"
+              className="px-4 py-2 border border-[#D5CEBC] rounded text-xs font-bold uppercase cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="btn-primary px-5 py-2 text-xs uppercase font-bold"
+              className="btn-primary px-5 py-2 text-xs uppercase font-bold cursor-pointer"
             >
-              Save Photo
+              {editingPhoto ? "Update Photo" : "Save to Album"}
             </button>
           </div>
         </form>

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, Pencil } from "lucide-react";
 import { Modal } from "antd";
 import { toast } from "sonner";
 
@@ -25,32 +25,79 @@ const INITIAL_MEMBERS: Member[] = [
 export default function TeamAdminPage() {
   const [members, setMembers] = useState<Member[]>(INITIAL_MEMBERS);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [formState, setFormState] = useState({ name: "", designation: "", panelYear: "2025-26" });
+  const [editingMember, setEditingMember] = useState<Member | null>(null);
+
+  const [formState, setFormState] = useState({
+    name: "",
+    designation: "",
+    panelYear: "2025-26",
+    isModerator: false,
+  });
+
+  const openAddModal = () => {
+    setEditingMember(null);
+    setFormState({
+      name: "",
+      designation: "",
+      panelYear: "2025-26",
+      isModerator: false,
+    });
+    setIsModalOpen(true);
+  };
+
+  const openEditModal = (m: Member) => {
+    setEditingMember(m);
+    setFormState({
+      name: m.name,
+      designation: m.designation,
+      panelYear: m.panelYear,
+      isModerator: m.isModerator,
+    });
+    setIsModalOpen(true);
+  };
 
   const toggleVisibility = (id: string) => {
     setMembers((prev) =>
       prev.map((m) => (m.id === id ? { ...m, isVisible: !m.isVisible } : m))
     );
-    toast.success("Visibility toggled.");
+    toast.success("Visibility updated.");
   };
 
-  const handleAdd = (e: React.FormEvent) => {
+  const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formState.name.trim()) return;
 
-    const newMem: Member = {
-      id: String(Date.now()),
-      name: formState.name,
-      designation: formState.designation,
-      panelYear: formState.panelYear,
-      isModerator: false,
-      isVisible: true,
-    };
+    if (editingMember) {
+      // Update existing
+      setMembers((prev) =>
+        prev.map((m) =>
+          m.id === editingMember.id
+            ? {
+                ...m,
+                name: formState.name,
+                designation: formState.designation,
+                panelYear: formState.panelYear,
+                isModerator: formState.isModerator,
+              }
+            : m
+        )
+      );
+      toast.success("Team member details updated.");
+    } else {
+      // Create new
+      const newMem: Member = {
+        id: String(Date.now()),
+        name: formState.name,
+        designation: formState.designation,
+        panelYear: formState.panelYear,
+        isModerator: formState.isModerator,
+        isVisible: true,
+      };
+      setMembers([...members, newMem]);
+      toast.success("New team member added.");
+    }
 
-    setMembers([...members, newMem]);
     setIsModalOpen(false);
-    setFormState({ name: "", designation: "", panelYear: "2025-26" });
-    toast.success("Team member added.");
   };
 
   const handleDelete = (id: string) => {
@@ -73,7 +120,7 @@ export default function TeamAdminPage() {
         </div>
 
         <button
-          onClick={() => setIsModalOpen(true)}
+          onClick={openAddModal}
           className="btn-primary text-xs uppercase tracking-wider py-2.5 px-5 font-bold inline-flex items-center gap-2 cursor-pointer self-start sm:self-center"
         >
           <Plus className="w-4 h-4" />
@@ -124,15 +171,24 @@ export default function TeamAdminPage() {
                   </button>
                 </td>
                 <td className="p-3.5 text-right">
-                  {!m.isModerator && (
+                  <div className="flex items-center justify-end gap-1.5">
                     <button
-                      onClick={() => handleDelete(m.id)}
-                      className="p-1 text-rose-700 hover:bg-rose-50 rounded cursor-pointer"
-                      title="Delete Member"
+                      onClick={() => openEditModal(m)}
+                      className="p-1.5 text-[#1A1614] hover:bg-[#EFEADB] rounded cursor-pointer transition-colors"
+                      title="Edit Member Details"
                     >
-                      <Trash2 className="w-4 h-4" />
+                      <Pencil className="w-3.5 h-3.5" />
                     </button>
-                  )}
+                    {!m.isModerator && (
+                      <button
+                        onClick={() => handleDelete(m.id)}
+                        className="p-1.5 text-rose-700 hover:bg-rose-50 rounded cursor-pointer transition-colors"
+                        title="Delete Member"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}
@@ -140,67 +196,89 @@ export default function TeamAdminPage() {
         </table>
       </div>
 
-      {/* Add Modal */}
+      {/* Add / Edit Member Modal */}
       <Modal
         open={isModalOpen}
         onCancel={() => setIsModalOpen(false)}
         footer={null}
         title={
           <span className="font-display font-bold text-base uppercase text-[#1A1614]">
-            Add Executive Committee Member
+            {editingMember ? "Update Team Member" : "Add Executive Committee Member"}
           </span>
         }
       >
-        <form onSubmit={handleAdd} className="space-y-4 pt-2 text-xs">
+        <form onSubmit={handleSave} className="space-y-4 pt-2 text-xs">
           <div>
-            <label className="block font-bold text-[#1A1614] uppercase mb-1">Full Name</label>
+            <label className="block font-bold text-[#1A1614] uppercase mb-1">
+              Full Name <span className="text-[#A81818]">*</span>
+            </label>
             <input
               type="text"
               required
               placeholder="e.g. Mahir Faisal"
               value={formState.name}
               onChange={(e) => setFormState({ ...formState, name: e.target.value })}
-              className="w-full p-2.5 rounded border border-[#D5CEBC] bg-[#F5F1E6] text-xs"
+              className="w-full p-2.5 rounded border border-[#D5CEBC] bg-[#F5F1E6] text-xs font-medium"
             />
           </div>
 
           <div>
-            <label className="block font-bold text-[#1A1614] uppercase mb-1">Designation</label>
+            <label className="block font-bold text-[#1A1614] uppercase mb-1">
+              Designation / Role <span className="text-[#A81818]">*</span>
+            </label>
             <input
               type="text"
               required
               placeholder="e.g. Assistant General Secretary"
               value={formState.designation}
               onChange={(e) => setFormState({ ...formState, designation: e.target.value })}
-              className="w-full p-2.5 rounded border border-[#D5CEBC] bg-[#F5F1E6] text-xs"
+              className="w-full p-2.5 rounded border border-[#D5CEBC] bg-[#F5F1E6] text-xs font-medium"
             />
           </div>
 
-          <div>
-            <label className="block font-bold text-[#1A1614] uppercase mb-1">Panel Year</label>
-            <input
-              type="text"
-              required
-              placeholder="2025-26"
-              value={formState.panelYear}
-              onChange={(e) => setFormState({ ...formState, panelYear: e.target.value })}
-              className="w-full p-2.5 rounded border border-[#D5CEBC] bg-[#F5F1E6] text-xs"
-            />
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block font-bold text-[#1A1614] uppercase mb-1">
+                Panel Year
+              </label>
+              <input
+                type="text"
+                required
+                placeholder="2025-26"
+                value={formState.panelYear}
+                onChange={(e) => setFormState({ ...formState, panelYear: e.target.value })}
+                className="w-full p-2.5 rounded border border-[#D5CEBC] bg-white text-xs font-medium"
+              />
+            </div>
+
+            <div className="flex items-center pt-6">
+              <label className="inline-flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formState.isModerator}
+                  onChange={(e) => setFormState({ ...formState, isModerator: e.target.checked })}
+                  className="w-4 h-4 rounded text-[#A81818]"
+                />
+                <span className="text-xs font-bold text-[#1A1614] uppercase">
+                  Faculty Moderator
+                </span>
+              </label>
+            </div>
           </div>
 
-          <div className="pt-2 flex justify-end gap-2">
+          <div className="pt-3 border-t border-[#EFEADB] flex justify-end gap-2">
             <button
               type="button"
               onClick={() => setIsModalOpen(false)}
-              className="px-4 py-2 border border-[#D5CEBC] rounded text-xs font-bold uppercase"
+              className="px-4 py-2 border border-[#D5CEBC] rounded text-xs font-bold uppercase cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="btn-primary px-5 py-2 text-xs uppercase font-bold"
+              className="btn-primary px-5 py-2 text-xs uppercase font-bold cursor-pointer"
             >
-              Save Member
+              {editingMember ? "Update Member" : "Save Member"}
             </button>
           </div>
         </form>

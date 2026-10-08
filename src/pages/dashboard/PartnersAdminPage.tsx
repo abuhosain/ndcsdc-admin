@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, Trash2, ExternalLink } from "lucide-react";
+import { Plus, Trash2, ExternalLink, Pencil } from "lucide-react";
 import { Modal } from "antd";
 import { toast } from "sonner";
 
@@ -23,7 +23,29 @@ const INITIAL_PARTNERS: PartnerItem[] = [
 export default function PartnersAdminPage() {
   const [partners, setPartners] = useState<PartnerItem[]>(INITIAL_PARTNERS);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [formState, setFormState] = useState({ name: "", tier: "GOLD" as any, websiteUrl: "" });
+  const [editingPartner, setEditingPartner] = useState<PartnerItem | null>(null);
+
+  const [formState, setFormState] = useState({
+    name: "",
+    tier: "GOLD" as PartnerItem["tier"],
+    websiteUrl: "",
+  });
+
+  const openAddModal = () => {
+    setEditingPartner(null);
+    setFormState({ name: "", tier: "GOLD", websiteUrl: "" });
+    setIsModalOpen(true);
+  };
+
+  const openEditModal = (p: PartnerItem) => {
+    setEditingPartner(p);
+    setFormState({
+      name: p.name,
+      tier: p.tier,
+      websiteUrl: p.websiteUrl,
+    });
+    setIsModalOpen(true);
+  };
 
   const toggleVisibility = (id: string) => {
     setPartners((prev) =>
@@ -32,23 +54,38 @@ export default function PartnersAdminPage() {
     toast.success("Partner visibility updated.");
   };
 
-  const handleAdd = (e: React.FormEvent) => {
+  const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formState.name.trim()) return;
 
-    const newPartner: PartnerItem = {
-      id: String(Date.now()),
-      name: formState.name,
-      tier: formState.tier,
-      websiteUrl: formState.websiteUrl,
-      logo: "",
-      isVisible: true,
-    };
+    if (editingPartner) {
+      setPartners((prev) =>
+        prev.map((p) =>
+          p.id === editingPartner.id
+            ? {
+                ...p,
+                name: formState.name,
+                tier: formState.tier,
+                websiteUrl: formState.websiteUrl,
+              }
+            : p
+        )
+      );
+      toast.success("Partner details updated.");
+    } else {
+      const newPartner: PartnerItem = {
+        id: String(Date.now()),
+        name: formState.name,
+        tier: formState.tier,
+        websiteUrl: formState.websiteUrl,
+        logo: "",
+        isVisible: true,
+      };
+      setPartners([...partners, newPartner]);
+      toast.success("Partner added.");
+    }
 
-    setPartners([...partners, newPartner]);
     setIsModalOpen(false);
-    setFormState({ name: "", tier: "GOLD", websiteUrl: "" });
-    toast.success("Partner added.");
   };
 
   const handleDelete = (id: string) => {
@@ -71,7 +108,7 @@ export default function PartnersAdminPage() {
         </div>
 
         <button
-          onClick={() => setIsModalOpen(true)}
+          onClick={openAddModal}
           className="btn-primary text-xs uppercase tracking-wider py-2.5 px-5 font-bold inline-flex items-center gap-2 cursor-pointer self-start sm:self-center"
         >
           <Plus className="w-4 h-4" />
@@ -141,18 +178,28 @@ export default function PartnersAdminPage() {
                       p.isVisible ? "bg-emerald-100 text-emerald-800" : "bg-neutral-200 text-neutral-600"
                     }`}
                   >
-                    {p.isVisible ? "VISIBLE" : "HIDDEN"}
+                    {p.isVisible ? "ACTIVE" : "PAUSED"}
                   </button>
                 </td>
                 <td className="p-3.5 text-right">
-                  {p.tier !== "WEBSITE" && (
+                  <div className="flex items-center justify-end gap-1.5">
                     <button
-                      onClick={() => handleDelete(p.id)}
-                      className="p-1 text-rose-700 hover:bg-rose-50 rounded cursor-pointer"
+                      onClick={() => openEditModal(p)}
+                      className="p-1.5 text-[#1A1614] hover:bg-[#EFEADB] rounded cursor-pointer transition-colors"
+                      title="Edit Partner"
                     >
-                      <Trash2 className="w-4 h-4" />
+                      <Pencil className="w-3.5 h-3.5" />
                     </button>
-                  )}
+                    {p.tier !== "WEBSITE" && (
+                      <button
+                        onClick={() => handleDelete(p.id)}
+                        className="p-1.5 text-rose-700 hover:bg-rose-50 rounded cursor-pointer transition-colors"
+                        title="Delete Partner"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}
@@ -160,68 +207,75 @@ export default function PartnersAdminPage() {
         </table>
       </div>
 
-      {/* Add Modal */}
+      {/* Add / Edit Partner Modal */}
       <Modal
         open={isModalOpen}
         onCancel={() => setIsModalOpen(false)}
         footer={null}
         title={
           <span className="font-display font-bold text-base uppercase text-[#1A1614]">
-            Add Partner / Sponsor
+            {editingPartner ? "Update Partner / Sponsor" : "Add Partner / Sponsor"}
           </span>
         }
       >
-        <form onSubmit={handleAdd} className="space-y-4 pt-2 text-xs">
+        <form onSubmit={handleSave} className="space-y-4 pt-2 text-xs">
           <div>
-            <label className="block font-bold text-[#1A1614] uppercase mb-1">Partner Name</label>
+            <label className="block font-bold text-[#1A1614] uppercase mb-1">
+              Organization / Brand Name <span className="text-[#A81818]">*</span>
+            </label>
             <input
               type="text"
               required
-              placeholder="e.g. British Council"
+              placeholder="e.g. Grameenphone / Daily Star"
               value={formState.name}
               onChange={(e) => setFormState({ ...formState, name: e.target.value })}
-              className="w-full p-2.5 rounded border border-[#D5CEBC] bg-[#F5F1E6] text-xs"
+              className="w-full p-2.5 rounded border border-[#D5CEBC] bg-[#F5F1E6] text-xs font-medium"
             />
           </div>
 
           <div>
-            <label className="block font-bold text-[#1A1614] uppercase mb-1">Partner Tier</label>
+            <label className="block font-bold text-[#1A1614] uppercase mb-1">
+              Sponsorship Tier
+            </label>
             <select
               value={formState.tier}
               onChange={(e) => setFormState({ ...formState, tier: e.target.value as any })}
-              className="w-full p-2.5 rounded border border-[#D5CEBC] bg-white text-xs font-semibold"
+              className="w-full p-2.5 rounded border border-[#D5CEBC] bg-white text-xs font-semibold cursor-pointer"
             >
-              <option value="TITLE">TITLE</option>
-              <option value="GOLD">GOLD</option>
-              <option value="SILVER">SILVER</option>
-              <option value="SUPPORT">SUPPORT</option>
+              <option value="TITLE">Title Partner</option>
+              <option value="GOLD">Gold Sponsor</option>
+              <option value="SILVER">Silver Sponsor</option>
+              <option value="SUPPORT">Supporting Partner</option>
+              <option value="WEBSITE">Website Partner</option>
             </select>
           </div>
 
           <div>
-            <label className="block font-bold text-[#1A1614] uppercase mb-1">Website URL</label>
+            <label className="block font-bold text-[#1A1614] uppercase mb-1">
+              Website URL
+            </label>
             <input
               type="url"
-              placeholder="https://partner-website.com"
+              placeholder="https://example.com"
               value={formState.websiteUrl}
               onChange={(e) => setFormState({ ...formState, websiteUrl: e.target.value })}
-              className="w-full p-2.5 rounded border border-[#D5CEBC] bg-[#F5F1E6] text-xs"
+              className="w-full p-2.5 rounded border border-[#D5CEBC] bg-[#F5F1E6] text-xs font-medium"
             />
           </div>
 
-          <div className="pt-2 flex justify-end gap-2">
+          <div className="pt-3 border-t border-[#EFEADB] flex justify-end gap-2">
             <button
               type="button"
               onClick={() => setIsModalOpen(false)}
-              className="px-4 py-2 border border-[#D5CEBC] rounded text-xs font-bold uppercase"
+              className="px-4 py-2 border border-[#D5CEBC] rounded text-xs font-bold uppercase cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="btn-primary px-5 py-2 text-xs uppercase font-bold"
+              className="btn-primary px-5 py-2 text-xs uppercase font-bold cursor-pointer"
             >
-              Save Partner
+              {editingPartner ? "Update Partner" : "Save Partner"}
             </button>
           </div>
         </form>

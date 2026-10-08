@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, Pencil } from "lucide-react";
 import { Modal } from "antd";
 import { toast } from "sonner";
 
@@ -42,6 +42,8 @@ const INITIAL_ACTIVITIES: Activity[] = [
 export default function ActivitiesAdminPage() {
   const [activities, setActivities] = useState<Activity[]>(INITIAL_ACTIVITIES);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingActivity, setEditingActivity] = useState<Activity | null>(null);
+
   const [formState, setFormState] = useState({
     title: "",
     category: "Study Fair",
@@ -49,6 +51,30 @@ export default function ActivitiesAdminPage() {
     summary: "",
     status: "PUBLISHED" as "PUBLISHED" | "DRAFT",
   });
+
+  const openAddModal = () => {
+    setEditingActivity(null);
+    setFormState({
+      title: "",
+      category: "Study Fair",
+      date: new Date().toISOString().slice(0, 10),
+      summary: "",
+      status: "PUBLISHED",
+    });
+    setIsModalOpen(true);
+  };
+
+  const openEditModal = (act: Activity) => {
+    setEditingActivity(act);
+    setFormState({
+      title: act.title,
+      category: act.category,
+      date: act.date,
+      summary: act.summary,
+      status: act.status,
+    });
+    setIsModalOpen(true);
+  };
 
   const toggleStatus = (id: string) => {
     setActivities((prev) =>
@@ -61,19 +87,36 @@ export default function ActivitiesAdminPage() {
     toast.success("Activity status updated.");
   };
 
-  const handleAdd = (e: React.FormEvent) => {
+  const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formState.title.trim()) return;
 
-    const newAct: Activity = {
-      id: String(Date.now()),
-      ...formState,
-    };
+    if (editingActivity) {
+      setActivities((prev) =>
+        prev.map((act) =>
+          act.id === editingActivity.id
+            ? {
+                ...act,
+                title: formState.title,
+                category: formState.category,
+                date: formState.date,
+                summary: formState.summary,
+                status: formState.status,
+              }
+            : act
+        )
+      );
+      toast.success("Activity updated successfully.");
+    } else {
+      const newAct: Activity = {
+        id: String(Date.now()),
+        ...formState,
+      };
+      setActivities([newAct, ...activities]);
+      toast.success("Activity post published successfully.");
+    }
 
-    setActivities([newAct, ...activities]);
     setIsModalOpen(false);
-    setFormState({ title: "", category: "Study Fair", date: "", summary: "", status: "PUBLISHED" });
-    toast.success("Activity published successfully.");
   };
 
   const handleDelete = (id: string) => {
@@ -96,7 +139,7 @@ export default function ActivitiesAdminPage() {
         </div>
 
         <button
-          onClick={() => setIsModalOpen(true)}
+          onClick={openAddModal}
           className="btn-primary text-xs uppercase tracking-wider py-2.5 px-5 font-bold inline-flex items-center gap-2 cursor-pointer self-start sm:self-center"
         >
           <Plus className="w-4 h-4" />
@@ -146,13 +189,22 @@ export default function ActivitiesAdminPage() {
                   </button>
                 </td>
                 <td className="p-3.5 text-right">
-                  <button
-                    onClick={() => handleDelete(act.id)}
-                    className="p-1 text-rose-700 hover:bg-rose-50 rounded cursor-pointer"
-                    title="Delete Activity"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  <div className="flex items-center justify-end gap-1.5">
+                    <button
+                      onClick={() => openEditModal(act)}
+                      className="p-1.5 text-[#1A1614] hover:bg-[#EFEADB] rounded cursor-pointer transition-colors"
+                      title="Edit Activity"
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => handleDelete(act.id)}
+                      className="p-1.5 text-rose-700 hover:bg-rose-50 rounded cursor-pointer transition-colors"
+                      title="Delete Activity"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}
@@ -160,18 +212,18 @@ export default function ActivitiesAdminPage() {
         </table>
       </div>
 
-      {/* New Activity Modal */}
+      {/* Add / Edit Activity Modal */}
       <Modal
         open={isModalOpen}
         onCancel={() => setIsModalOpen(false)}
         footer={null}
         title={
           <span className="font-display font-bold text-base uppercase text-[#1A1614]">
-            Create New Activity Post
+            {editingActivity ? "Update Activity Post" : "Create New Activity Post"}
           </span>
         }
       >
-        <form onSubmit={handleAdd} className="space-y-4 pt-2 text-xs">
+        <form onSubmit={handleSave} className="space-y-4 pt-2 text-xs">
           <div>
             <label className="block font-bold text-[#1A1614] uppercase mb-1">
               Title <span className="text-[#A81818]">*</span>
@@ -182,7 +234,7 @@ export default function ActivitiesAdminPage() {
               placeholder="e.g. Science Olympiad Mentorship Camp"
               value={formState.title}
               onChange={(e) => setFormState({ ...formState, title: e.target.value })}
-              className="w-full p-2.5 rounded border border-[#D5CEBC] bg-[#F5F1E6] text-xs"
+              className="w-full p-2.5 rounded border border-[#D5CEBC] bg-[#F5F1E6] text-xs font-medium"
             />
           </div>
 
@@ -192,7 +244,7 @@ export default function ActivitiesAdminPage() {
               <select
                 value={formState.category}
                 onChange={(e) => setFormState({ ...formState, category: e.target.value })}
-                className="w-full p-2.5 rounded border border-[#D5CEBC] bg-white text-xs font-semibold"
+                className="w-full p-2.5 rounded border border-[#D5CEBC] bg-white text-xs font-semibold cursor-pointer"
               >
                 <option value="Study Fair">Study Fair</option>
                 <option value="Masterclass">Masterclass</option>
@@ -208,7 +260,7 @@ export default function ActivitiesAdminPage() {
                 required
                 value={formState.date}
                 onChange={(e) => setFormState({ ...formState, date: e.target.value })}
-                className="w-full p-2.5 rounded border border-[#D5CEBC] bg-white text-xs"
+                className="w-full p-2.5 rounded border border-[#D5CEBC] bg-white text-xs font-medium"
               />
             </div>
           </div>
@@ -221,23 +273,23 @@ export default function ActivitiesAdminPage() {
               placeholder="Brief description of the event, attendees, and highlights..."
               value={formState.summary}
               onChange={(e) => setFormState({ ...formState, summary: e.target.value })}
-              className="w-full p-2.5 rounded border border-[#D5CEBC] bg-[#F5F1E6] text-xs"
+              className="w-full p-2.5 rounded border border-[#D5CEBC] bg-[#F5F1E6] text-xs font-medium"
             ></textarea>
           </div>
 
-          <div className="pt-2 flex justify-end gap-2">
+          <div className="pt-3 border-t border-[#EFEADB] flex justify-end gap-2">
             <button
               type="button"
               onClick={() => setIsModalOpen(false)}
-              className="px-4 py-2 border border-[#D5CEBC] rounded text-xs font-bold uppercase"
+              className="px-4 py-2 border border-[#D5CEBC] rounded text-xs font-bold uppercase cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="btn-primary px-5 py-2 text-xs uppercase font-bold"
+              className="btn-primary px-5 py-2 text-xs uppercase font-bold cursor-pointer"
             >
-              Save Activity
+              {editingActivity ? "Update Activity" : "Save Activity"}
             </button>
           </div>
         </form>
