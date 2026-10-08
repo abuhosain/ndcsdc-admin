@@ -94,14 +94,21 @@ export default function Sidebar({
       trigger={null}
       breakpoint="lg"
       collapsedWidth={76}
-      style={{ backgroundColor: "#1A1614" }}
-      className="border-r border-neutral-800 bg-[#1A1614] min-h-screen"
+      style={{
+        backgroundColor: "#1A1614",
+        height: "100vh",
+        position: "sticky",
+        top: 0,
+        left: 0,
+        zIndex: 50,
+      }}
+      className="border-r border-neutral-800 bg-[#1A1614] h-screen shrink-0"
       width={260}
     >
-      <div className="flex flex-col h-full z-50">
+      <div className="flex flex-col h-full overflow-hidden">
         
         {/* Brand Header */}
-        <div className="p-4 border-b border-neutral-800/80 flex items-center justify-between">
+        <div className="p-4 border-b border-neutral-800/80 flex items-center justify-between shrink-0">
           <Link to="/dashboard" className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-lg bg-white p-1 flex items-center justify-center shrink-0 border border-neutral-700">
               <img
@@ -146,7 +153,7 @@ export default function Sidebar({
         </div>
 
         {/* Footer Actions */}
-        <div className="p-3 border-t border-neutral-800/80 space-y-2">
+        <div className="p-3 border-t border-neutral-800/80 space-y-2 shrink-0">
           <a
             href="http://localhost:3000"
             target="_blank"

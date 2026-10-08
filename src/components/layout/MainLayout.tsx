@@ -38,13 +38,13 @@ export default function MainLayout() {
   };
 
   return (
-    <Layout className="min-h-screen bg-[#F5F1E6]">
+    <Layout hasSider className="min-h-screen bg-[#F5F1E6]">
       <Sidebar
         minimizeSidebar={minimizeSidebar}
         setMinimizeSidebar={setMinimizeSidebar}
       />
 
-      <Layout className="bg-[#F5F1E6]">
+      <Layout className="bg-[#F5F1E6] min-h-screen min-w-0 flex-1 flex flex-col">
         {/* Top Header */}
         <Header
           style={{ background: "#FFFFFF", padding: "0 24px" }}
