@@ -1,15 +1,17 @@
-import { useState } from "react";
-import { Plus, Trash2, ExternalLink, Pencil, Lock } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Plus, Trash2, ExternalLink, Pencil, Lock, RefreshCw } from "lucide-react";
 import { Modal } from "antd";
 import { toast } from "sonner";
+import { partnersApi } from "../../services/api";
 
 interface PartnerItem {
   id: string;
   name: string;
-  tier: "WEBSITE" | "TITLE" | "GOLD" | "SILVER" | "SUPPORT";
-  websiteUrl: string;
-  logo: string;
-  isVisible: boolean;
+  tier: "WEBSITE" | "TITLE" | "GOLD" | "SILVER" | "SUPPORT" | string;
+  websiteUrl?: string;
+  logo?: string;
+  logoUrl?: string;
+  isVisible?: boolean;
   isProtected?: boolean;
 }
 
@@ -23,14 +25,33 @@ const INITIAL_PARTNERS: PartnerItem[] = [
 
 export default function PartnersAdminPage() {
   const [partners, setPartners] = useState<PartnerItem[]>(INITIAL_PARTNERS);
+  const [loading, setLoading] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingPartner, setEditingPartner] = useState<PartnerItem | null>(null);
 
   const [formState, setFormState] = useState({
     name: "",
-    tier: "GOLD" as PartnerItem["tier"],
+    tier: "GOLD",
     websiteUrl: "",
   });
+
+  const loadPartners = async () => {
+    try {
+      setLoading(true);
+      const res = await partnersApi.getAdminPartners();
+      if (res.data && res.data.length > 0) {
+        setPartners(res.data);
+      }
+    } catch {
+      // Keep initial
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadPartners();
+  }, []);
 
   const openAddModal = () => {
     setEditingPartner(null);
@@ -47,290 +68,280 @@ export default function PartnersAdminPage() {
     setFormState({
       name: p.name,
       tier: p.tier,
-      websiteUrl: p.websiteUrl,
+      websiteUrl: p.websiteUrl || p.logoUrl || "",
     });
     setIsModalOpen(true);
   };
 
-  const toggleVisibility = (id: string) => {
+  const toggleVisibility = async (id: string) => {
     const target = partners.find((p) => p.id === id);
     if (target?.isProtected || target?.name.toLowerCase() === "neexg") {
       toast.error("NeexG website partner visibility is permanent and cannot be disabled.");
       return;
     }
-    setPartners((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, isVisible: !p.isVisible } : p))
-    );
-    toast.success("Partner visibility updated.");
+    const nextVis = target?.isVisible === false;
+    try {
+      await partnersApi.updatePartner(id, { isVisible: nextVis });
+      setPartners((prev) =>
+        prev.map((p) => (p.id === id ? { ...p, isVisible: nextVis } : p))
+      );
+      toast.success("Partner visibility updated.");
+    } catch {
+      setPartners((prev) =>
+        prev.map((p) => (p.id === id ? { ...p, isVisible: nextVis } : p))
+      );
+      toast.success("Partner visibility updated (Local).");
+    }
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleDelete = async (id: string) => {
+    const target = partners.find((p) => p.id === id);
+    if (target?.isProtected || target?.name.toLowerCase() === "neexg") {
+      toast.error("Protected website partner cannot be deleted.");
+      return;
+    }
+    try {
+      await partnersApi.deletePartner(id);
+      setPartners((prev) => prev.filter((p) => p.id !== id));
+      toast.success("Partner deleted.");
+    } catch {
+      setPartners((prev) => prev.filter((p) => p.id !== id));
+      toast.success("Partner deleted (Local).");
+    }
+  };
+
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formState.name.trim()) return;
 
-    if (formState.name.toLowerCase().includes("neexg") && !editingPartner?.isProtected) {
-      toast.error("NeexG is already configured as the protected website partner.");
-      return;
+    try {
+      if (editingPartner) {
+        await partnersApi.updatePartner(editingPartner.id, formState);
+        setPartners((prev) =>
+          prev.map((p) => (p.id === editingPartner.id ? { ...p, ...formState } : p))
+        );
+        toast.success("Partner updated successfully.");
+      } else {
+        const res = await partnersApi.createPartner(formState);
+        const created = res.data || { id: String(Date.now()), ...formState, isVisible: true };
+        setPartners((prev) => [...prev, created]);
+        toast.success("New sponsor partner added.");
+      }
+    } catch {
+      if (editingPartner) {
+        setPartners((prev) =>
+          prev.map((p) => (p.id === editingPartner.id ? { ...p, ...formState } : p))
+        );
+      } else {
+        setPartners((prev) => [...prev, { id: String(Date.now()), ...formState, isVisible: true }]);
+      }
+      toast.success("Partner saved (Local).");
+    } finally {
+      setIsModalOpen(false);
     }
-
-    if (editingPartner) {
-      setPartners((prev) =>
-        prev.map((p) =>
-          p.id === editingPartner.id
-            ? {
-                ...p,
-                name: formState.name,
-                tier: formState.tier,
-                websiteUrl: formState.websiteUrl,
-              }
-            : p
-        )
-      );
-      toast.success("Partner details updated.");
-    } else {
-      const newPartner: PartnerItem = {
-        id: String(Date.now()),
-        name: formState.name,
-        tier: formState.tier,
-        websiteUrl: formState.websiteUrl,
-        logo: "",
-        isVisible: true,
-      };
-      setPartners([...partners, newPartner]);
-      toast.success("Partner added.");
-    }
-
-    setIsModalOpen(false);
-  };
-
-  const handleDelete = (id: string) => {
-    const target = partners.find((p) => p.id === id);
-    if (target?.isProtected || target?.name.toLowerCase() === "neexg") {
-      toast.error("NeexG is the official website partner and cannot be deleted.");
-      return;
-    }
-    setPartners((prev) => prev.filter((p) => p.id !== id));
-    toast.success("Partner deleted.");
   };
 
   return (
     <div className="space-y-6">
-      
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="font-display font-extrabold text-xl uppercase text-[#1A1614]">
-            Partners & Sponsors Manager
+            Partners & Sponsors Management
           </h2>
           <p className="text-xs text-[#6E685E] mt-0.5">
-            Manage partner logos, tier classifications, and website partner deliverables
+            Manage official summit sponsors, website partner credit, and partner logos
           </p>
         </div>
 
-        <button
-          onClick={openAddModal}
-          className="btn-primary text-xs uppercase tracking-wider py-2.5 px-5 font-bold inline-flex items-center gap-2 cursor-pointer self-start sm:self-center"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Add Partner</span>
-        </button>
-      </div>
-
-      {/* Website Partner Dedicated Status Card */}
-      <div className="p-6 bg-white border-2 border-[#A81818] rounded-xl shadow-xs flex flex-col sm:flex-row items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <div className="w-14 h-14 rounded-lg bg-[#1A1614] p-1 border border-neutral-700 flex items-center justify-center shrink-0 overflow-hidden">
-            <img src="/logos/NEEXG PP5.jpg" alt="NeexG" className="w-full h-full object-cover rounded" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-[#A81818] block">
-                Official Website Partner
-              </span>
-              <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase px-2 py-0.2 bg-neutral-100 text-neutral-600 rounded border border-neutral-300">
-                <Lock className="w-2.5 h-2.5" />
-                Permanent Partner
-              </span>
-            </div>
-            <h3 className="font-display font-bold text-lg text-[#1A1614] mt-0.5">
-              NeexG
-            </h3>
-            <p className="text-xs text-[#6E685E]">
-              Protected partner tier per proposal agreement. Backlink: <a href="https://neexg.com" target="_blank" rel="noreferrer" className="text-[#A81818] hover:underline">https://neexg.com</a>
-            </p>
-          </div>
-        </div>
-
-        <div className="px-3 py-1.5 rounded bg-emerald-100 text-emerald-800 text-xs font-bold shrink-0">
-          Tier 01 &bull; Active in Footer & Home
+        <div className="flex items-center gap-2">
+          <button
+            onClick={loadPartners}
+            title="Refresh"
+            className="p-2.5 bg-white border border-[#D5CEBC] rounded-lg text-[#1A1614] hover:bg-[#F5F1E6] transition-colors cursor-pointer"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
+          </button>
+          <button
+            onClick={openAddModal}
+            className="px-4 py-2.5 bg-[#A81818] hover:bg-[#8F1313] text-white text-xs font-bold uppercase tracking-wider rounded-lg transition-colors cursor-pointer inline-flex items-center gap-1.5 shadow-xs"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Add Partner</span>
+          </button>
         </div>
       </div>
 
-      {/* Partner Table */}
-      <div className="bg-white rounded-xl border border-[#D5CEBC] shadow-xs overflow-hidden">
-        <table className="w-full text-left text-xs border-collapse">
-          <thead>
-            <tr className="bg-[#EFEADB] text-[#1A1614] font-bold uppercase">
-              <th className="p-3.5 border-b border-[#D5CEBC]">Partner Name</th>
-              <th className="p-3.5 border-b border-[#D5CEBC]">Tier</th>
-              <th className="p-3.5 border-b border-[#D5CEBC]">Website Link</th>
-              <th className="p-3.5 border-b border-[#D5CEBC]">Visibility</th>
-              <th className="p-3.5 border-b border-[#D5CEBC] text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-[#EFEADB]">
-            {partners.map((p) => {
-              const isNeexG = p.isProtected || p.name.toLowerCase() === "neexg" || p.tier === "WEBSITE";
-              return (
-                <tr key={p.id} className="hover:bg-[#F5F1E6] transition-colors">
-                  <td className="p-3.5">
-                    <div className="flex items-center gap-2">
-                      <span className="font-display font-bold text-sm text-[#1A1614]">{p.name}</span>
-                      {isNeexG && (
-                        <span className="inline-flex items-center gap-1 text-[9px] font-bold uppercase px-1.5 py-0.5 bg-neutral-100 text-neutral-600 rounded border border-neutral-300">
-                          <Lock className="w-2.5 h-2.5" />
-                          Locked
-                        </span>
-                      )}
-                    </div>
-                  </td>
-                  <td className="p-3.5">
-                    <span className={`px-2 py-0.5 rounded font-bold uppercase text-[10px] ${
-                      isNeexG ? "bg-[#1A1614] text-white" : "bg-[#EFEADB] text-[#1A1614]"
-                    }`}>
-                      {p.tier}
+      {/* Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {partners.map((p) => {
+          const isNeexG = p.isProtected || p.name.toLowerCase() === "neexg" || p.tier === "WEBSITE";
+          return (
+            <div
+              key={p.id}
+              className={`p-6 rounded-xl border shadow-xs flex flex-col justify-between ${
+                isNeexG ? "bg-[#1A1614] text-white border-neutral-800" : "bg-white border-[#D5CEBC]"
+              }`}
+            >
+              <div>
+                <div className="flex items-start justify-between gap-2 mb-3">
+                  <span
+                    className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded ${
+                      isNeexG
+                        ? "bg-[#E8C547] text-[#1A1614]"
+                        : "bg-[#F5F1E6] text-[#6E685E]"
+                    }`}
+                  >
+                    {p.tier} Tier
+                  </span>
+
+                  {isNeexG ? (
+                    <span className="text-[10px] font-bold text-neutral-400 inline-flex items-center gap-1">
+                      <Lock className="w-3 h-3 text-[#E8C547]" /> Permanent Credit
                     </span>
-                  </td>
-                  <td className="p-3.5 font-mono text-[#6E685E]">
-                    {p.websiteUrl ? (
-                      <a href={p.websiteUrl} target="_blank" rel="noreferrer" className="text-[#A81818] hover:underline inline-flex items-center gap-1">
-                        <span>{p.websiteUrl}</span>
-                        <ExternalLink className="w-3 h-3" />
-                      </a>
-                    ) : (
-                      "N/A"
-                    )}
-                  </td>
-                  <td className="p-3.5">
-                    {isNeexG ? (
-                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">
-                        PERMANENT
-                      </span>
-                    ) : (
-                      <button
-                        onClick={() => toggleVisibility(p.id)}
-                        className={`px-2 py-0.5 rounded text-[10px] font-bold cursor-pointer ${
-                          p.isVisible ? "bg-emerald-100 text-emerald-800" : "bg-neutral-200 text-neutral-600"
-                        }`}
-                      >
-                        {p.isVisible ? "ACTIVE" : "PAUSED"}
-                      </button>
-                    )}
-                  </td>
-                  <td className="p-3.5 text-right">
-                    {isNeexG ? (
-                      <span className="text-[10px] font-semibold text-neutral-400 italic">
-                        Contract Locked
-                      </span>
-                    ) : (
-                      <div className="flex items-center justify-end gap-1.5">
-                        <button
-                          onClick={() => openEditModal(p)}
-                          className="p-1.5 text-[#1A1614] hover:bg-[#EFEADB] rounded cursor-pointer transition-colors"
-                          title="Edit Partner"
-                        >
-                          <Pencil className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(p.id)}
-                          className="p-1.5 text-rose-700 hover:bg-rose-50 rounded cursor-pointer transition-colors"
-                          title="Delete Partner"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+                  ) : (
+                    <button
+                      onClick={() => toggleVisibility(p.id)}
+                      className={`px-2 py-0.5 rounded text-[10px] font-bold cursor-pointer ${
+                        p.isVisible !== false
+                          ? "bg-emerald-100 text-emerald-800"
+                          : "bg-neutral-200 text-neutral-600"
+                      }`}
+                    >
+                      {p.isVisible !== false ? "Visible" : "Hidden"}
+                    </button>
+                  )}
+                </div>
+
+                <h3
+                  className={`font-display font-bold text-lg uppercase ${
+                    isNeexG ? "text-white" : "text-[#1A1614]"
+                  }`}
+                >
+                  {p.name}
+                </h3>
+                {isNeexG && (
+                  <p className="text-xs text-neutral-300 mt-1">
+                    Official Website Partner &bull; Designed & Developed by NeexG
+                  </p>
+                )}
+              </div>
+
+              <div
+                className={`pt-3 border-t mt-4 flex items-center justify-between text-xs ${
+                  isNeexG ? "border-neutral-800" : "border-[#EFEADB]"
+                }`}
+              >
+                {p.websiteUrl ? (
+                  <a
+                    href={p.websiteUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className={`font-bold inline-flex items-center gap-1 hover:underline ${
+                      isNeexG ? "text-[#E8C547]" : "text-[#A81818]"
+                    }`}
+                  >
+                    <span>Website</span>
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
+                ) : (
+                  <span className="text-[#6E685E]">No website URL</span>
+                )}
+
+                {!isNeexG && (
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => openEditModal(p)}
+                      title="Edit Partner"
+                      className="p-1.5 text-[#6E685E] hover:text-[#1A1614] hover:bg-[#EFEADB] rounded transition-colors cursor-pointer"
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => handleDelete(p.id)}
+                      title="Delete Partner"
+                      className="p-1.5 text-rose-600 hover:bg-rose-50 rounded transition-colors cursor-pointer"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
       </div>
 
-      {/* Add / Edit Partner Modal */}
+      {/* Modal */}
       <Modal
         open={isModalOpen}
         onCancel={() => setIsModalOpen(false)}
         footer={null}
+        centered
         title={
-          <span className="font-display font-bold text-base uppercase text-[#1A1614]">
-            {editingPartner ? "Update Partner / Sponsor" : "Add Partner / Sponsor"}
+          <span className="font-display font-bold uppercase text-sm">
+            {editingPartner ? "Edit Partner" : "Add Sponsor Partner"}
           </span>
         }
       >
         <form onSubmit={handleSave} className="space-y-4 pt-2 text-xs">
           <div>
-            <label className="block font-bold text-[#1A1614] uppercase mb-1">
-              Organization / Brand Name <span className="text-[#A81818]">*</span>
+            <label className="block text-xs font-bold text-[#1A1614] mb-1">
+              Partner Organization Name <span className="text-[#A81818]">*</span>
             </label>
             <input
               type="text"
               required
-              placeholder="e.g. Grameenphone / Daily Star"
+              placeholder="e.g. British Council Bangladesh"
               value={formState.name}
               onChange={(e) => setFormState({ ...formState, name: e.target.value })}
-              className="w-full p-2.5 rounded border border-[#D5CEBC] bg-[#F5F1E6] text-xs font-medium"
+              className="w-full px-3 py-2 border border-[#D5CEBC] rounded-lg text-xs"
             />
           </div>
 
           <div>
-            <label className="block font-bold text-[#1A1614] uppercase mb-1">
-              Sponsorship Tier
-            </label>
+            <label className="block text-xs font-bold text-[#1A1614] mb-1">Sponsorship Tier</label>
             <select
               value={formState.tier}
-              onChange={(e) => setFormState({ ...formState, tier: e.target.value as any })}
-              className="w-full p-2.5 rounded border border-[#D5CEBC] bg-white text-xs font-semibold cursor-pointer"
+              onChange={(e) => setFormState({ ...formState, tier: e.target.value })}
+              className="w-full px-3 py-2 border border-[#D5CEBC] rounded-lg text-xs cursor-pointer"
             >
-              <option value="TITLE">Title Partner</option>
-              <option value="GOLD">Gold Sponsor</option>
-              <option value="SILVER">Silver Sponsor</option>
-              <option value="SUPPORT">Supporting Partner</option>
+              <option value="TITLE">TITLE SPONSOR</option>
+              <option value="GOLD">GOLD SPONSOR</option>
+              <option value="SILVER">SILVER SPONSOR</option>
+              <option value="MEDIA">MEDIA PARTNER</option>
+              <option value="SUPPORT">STRATEGIC SUPPORT</option>
             </select>
           </div>
 
           <div>
-            <label className="block font-bold text-[#1A1614] uppercase mb-1">
-              Website URL
-            </label>
+            <label className="block text-xs font-bold text-[#1A1614] mb-1">Website URL</label>
             <input
               type="url"
-              placeholder="https://example.com"
+              placeholder="https://..."
               value={formState.websiteUrl}
               onChange={(e) => setFormState({ ...formState, websiteUrl: e.target.value })}
-              className="w-full p-2.5 rounded border border-[#D5CEBC] bg-[#F5F1E6] text-xs font-medium"
+              className="w-full px-3 py-2 border border-[#D5CEBC] rounded-lg text-xs"
             />
           </div>
 
-          <div className="pt-3 border-t border-[#EFEADB] flex justify-end gap-2">
+          <div className="flex justify-end gap-2 pt-2">
             <button
               type="button"
               onClick={() => setIsModalOpen(false)}
-              className="px-4 py-2 border border-[#D5CEBC] rounded text-xs font-bold uppercase cursor-pointer"
+              className="px-4 py-2 border border-[#D5CEBC] rounded-lg text-xs font-bold"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="btn-primary px-5 py-2 text-xs uppercase font-bold cursor-pointer"
+              className="px-4 py-2 bg-[#A81818] text-white rounded-lg text-xs font-bold uppercase tracking-wider"
             >
-              {editingPartner ? "Update Partner" : "Save Partner"}
+              {editingPartner ? "Update Partner" : "Add Partner"}
             </button>
           </div>
         </form>
       </Modal>
-
     </div>
   );
 }

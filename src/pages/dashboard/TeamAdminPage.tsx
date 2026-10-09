@@ -1,18 +1,20 @@
-import { useState } from "react";
-import { Plus, Trash2, Pencil } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Plus, Trash2, Pencil, RefreshCw } from "lucide-react";
 import { Modal } from "antd";
 import { toast } from "sonner";
+import { teamApi } from "../../services/api";
 
 export interface Member {
   id: string;
   name: string;
   designation: string;
-  phone: string;
-  email: string;
-  facebookUrl: string;
-  panelYear: string;
-  isModerator: boolean;
-  isVisible: boolean;
+  phone?: string;
+  email?: string;
+  facebookUrl?: string;
+  panelYear?: string;
+  isModerator?: boolean;
+  isVisible?: boolean;
+  sortOrder?: number;
 }
 
 const INITIAL_MEMBERS: Member[] = [
@@ -82,21 +84,11 @@ const INITIAL_MEMBERS: Member[] = [
     isModerator: false,
     isVisible: true,
   },
-  {
-    id: "7",
-    name: "Nabil Chowdhury",
-    designation: "Director of Operations",
-    phone: "+880 1716-789012",
-    email: "operations.ndcsdc@gmail.com",
-    facebookUrl: "https://facebook.com",
-    panelYear: "2025-26",
-    isModerator: false,
-    isVisible: true,
-  },
 ];
 
 export default function TeamAdminPage() {
   const [members, setMembers] = useState<Member[]>(INITIAL_MEMBERS);
+  const [loading, setLoading] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingMember, setEditingMember] = useState<Member | null>(null);
 
@@ -105,21 +97,41 @@ export default function TeamAdminPage() {
     designation: "",
     phone: "",
     email: "",
-    facebookUrl: "https://facebook.com",
+    facebookUrl: "",
     panelYear: "2025-26",
     isModerator: false,
+    isVisible: true,
   });
+
+  const loadTeam = async () => {
+    try {
+      setLoading(true);
+      const res = await teamApi.getAdminTeam();
+      if (res.data && res.data.length > 0) {
+        setMembers(res.data);
+      }
+    } catch {
+      // Keep initial
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadTeam();
+  }, []);
 
   const openAddModal = () => {
     setEditingMember(null);
     setFormState({
       name: "",
       designation: "",
-      phone: "+880 ",
+      phone: "",
       email: "",
       facebookUrl: "https://facebook.com",
       panelYear: "2025-26",
       isModerator: false,
+      isVisible: true,
     });
     setIsModalOpen(true);
   };
@@ -131,302 +143,306 @@ export default function TeamAdminPage() {
       designation: m.designation,
       phone: m.phone || "",
       email: m.email || "",
-      facebookUrl: m.facebookUrl || "https://facebook.com",
-      panelYear: m.panelYear,
-      isModerator: m.isModerator,
+      facebookUrl: m.facebookUrl || "",
+      panelYear: m.panelYear || "2025-26",
+      isModerator: Boolean(m.isModerator),
+      isVisible: m.isVisible !== false,
     });
     setIsModalOpen(true);
   };
 
-  const toggleVisibility = (id: string) => {
-    setMembers((prev) =>
-      prev.map((m) => (m.id === id ? { ...m, isVisible: !m.isVisible } : m))
-    );
-    toast.success("Visibility updated.");
+  const toggleVisibility = async (m: Member) => {
+    const nextVis = !m.isVisible;
+    try {
+      await teamApi.updateMember(m.id, { isVisible: nextVis });
+      setMembers((prev) =>
+        prev.map((item) => (item.id === m.id ? { ...item, isVisible: nextVis } : item))
+      );
+      toast.success("Member visibility updated.");
+    } catch {
+      setMembers((prev) =>
+        prev.map((item) => (item.id === m.id ? { ...item, isVisible: nextVis } : item))
+      );
+      toast.success("Member visibility updated (Local).");
+    }
   };
 
-  const handleSave = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formState.name.trim()) return;
+  const handleDelete = async (id: string) => {
+    try {
+      await teamApi.deleteMember(id);
+      setMembers((prev) => prev.filter((item) => item.id !== id));
+      toast.success("Team member deleted.");
+    } catch {
+      setMembers((prev) => prev.filter((item) => item.id !== id));
+      toast.success("Team member deleted (Local).");
+    }
+  };
 
-    if (editingMember) {
-      setMembers((prev) =>
-        prev.map((m) =>
-          m.id === editingMember.id
-            ? {
-                ...m,
-                name: formState.name,
-                designation: formState.designation,
-                phone: formState.phone,
-                email: formState.email,
-                facebookUrl: formState.facebookUrl,
-                panelYear: formState.panelYear,
-                isModerator: formState.isModerator,
-              }
-            : m
-        )
-      );
-      toast.success("Executive member updated successfully.");
-    } else {
-      const newMem: Member = {
-        id: String(Date.now()),
-        name: formState.name,
-        designation: formState.designation,
-        phone: formState.phone,
-        email: formState.email,
-        facebookUrl: formState.facebookUrl,
-        panelYear: formState.panelYear,
-        isModerator: formState.isModerator,
-        isVisible: true,
-      };
-      setMembers([...members, newMem]);
-      toast.success("New executive member added.");
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formState.name.trim() || !formState.designation.trim()) {
+      toast.error("Name and designation are required.");
+      return;
     }
 
-    setIsModalOpen(false);
-  };
-
-  const handleDelete = (id: string) => {
-    setMembers((prev) => prev.filter((m) => m.id !== id));
-    toast.success("Team member removed.");
+    try {
+      if (editingMember) {
+        await teamApi.updateMember(editingMember.id, formState);
+        setMembers((prev) =>
+          prev.map((m) => (m.id === editingMember.id ? { ...m, ...formState } : m))
+        );
+        toast.success("Team member updated.");
+      } else {
+        const res = await teamApi.createMember(formState);
+        const created = res.data || { id: String(Date.now()), ...formState };
+        setMembers((prev) => [...prev, created]);
+        toast.success("New team member added.");
+      }
+    } catch {
+      if (editingMember) {
+        setMembers((prev) =>
+          prev.map((m) => (m.id === editingMember.id ? { ...m, ...formState } : m))
+        );
+      } else {
+        setMembers((prev) => [...prev, { id: String(Date.now()), ...formState }]);
+      }
+      toast.success("Team member saved (Local).");
+    } finally {
+      setIsModalOpen(false);
+    }
   };
 
   return (
     <div className="space-y-6">
-      
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="font-display font-extrabold text-xl uppercase text-[#1A1614]">
-            Executive Team & Moderator Management
+            Team & Committee Management
           </h2>
           <p className="text-xs text-[#6E685E] mt-0.5">
-            Manage committee members, contact cards, designations, phone, email & Facebook profiles
+            Manage moderator profile, executive panel contacts, and public leadership directory
           </p>
         </div>
 
-        <button
-          onClick={openAddModal}
-          className="btn-primary text-xs uppercase tracking-wider py-2.5 px-5 font-bold inline-flex items-center gap-2 cursor-pointer self-start sm:self-center"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Add Team Member</span>
-        </button>
-      </div>
-
-      {/* Table */}
-      <div className="bg-white rounded-xl border border-[#D5CEBC] shadow-xs overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs border-collapse">
-            <thead>
-              <tr className="bg-[#EFEADB] text-[#1A1614] font-bold uppercase">
-                <th className="p-3.5 border-b border-[#D5CEBC]">Member Details</th>
-                <th className="p-3.5 border-b border-[#D5CEBC]">Designation</th>
-                <th className="p-3.5 border-b border-[#D5CEBC]">Contact (Phone & Email)</th>
-                <th className="p-3.5 border-b border-[#D5CEBC]">Panel Year</th>
-                <th className="p-3.5 border-b border-[#D5CEBC]">Status</th>
-                <th className="p-3.5 border-b border-[#D5CEBC] text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[#EFEADB]">
-              {members.map((m) => (
-                <tr key={m.id} className="hover:bg-[#F5F1E6] transition-colors">
-                  <td className="p-3.5">
-                    <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded bg-[#1A1614] text-white font-bold text-xs flex items-center justify-center shrink-0">
-                        {m.name.split(" ").map((n) => n[0]).slice(0, 2).join("")}
-                      </div>
-                      <div>
-                        <span className="font-display font-bold text-sm text-[#1A1614] block">
-                          {m.name}
-                        </span>
-                        {m.isModerator ? (
-                          <span className="text-[10px] font-bold text-[#A81818] uppercase">
-                            Faculty Moderator
-                          </span>
-                        ) : (
-                          <span className="text-[10px] text-[#6E685E]">
-                            Executive Committee
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </td>
-                  <td className="p-3.5 font-semibold text-[#1A1614]">{m.designation}</td>
-                  <td className="p-3.5">
-                    <div className="font-mono text-[#1A1614] text-xs">{m.phone}</div>
-                    <div className="text-[11px] text-[#6E685E] truncate max-w-[180px]">{m.email}</div>
-                  </td>
-                  <td className="p-3.5 font-mono text-[#6E685E]">{m.panelYear}</td>
-                  <td className="p-3.5">
-                    <button
-                      onClick={() => toggleVisibility(m.id)}
-                      className={`px-2 py-0.5 rounded text-[10px] font-bold cursor-pointer ${
-                        m.isVisible ? "bg-emerald-100 text-emerald-800" : "bg-neutral-200 text-neutral-600"
-                      }`}
-                    >
-                      {m.isVisible ? "VISIBLE" : "HIDDEN"}
-                    </button>
-                  </td>
-                  <td className="p-3.5 text-right">
-                    <div className="flex items-center justify-end gap-1.5">
-                      <button
-                        onClick={() => openEditModal(m)}
-                        className="p-1.5 text-[#1A1614] hover:bg-[#EFEADB] rounded cursor-pointer transition-colors"
-                        title="Edit Member Contact & Role"
-                      >
-                        <Pencil className="w-3.5 h-3.5" />
-                      </button>
-                      {!m.isModerator && (
-                        <button
-                          onClick={() => handleDelete(m.id)}
-                          className="p-1.5 text-rose-700 hover:bg-rose-50 rounded cursor-pointer transition-colors"
-                          title="Delete Member"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={loadTeam}
+            title="Refresh"
+            className="p-2.5 bg-white border border-[#D5CEBC] rounded-lg text-[#1A1614] hover:bg-[#F5F1E6] transition-colors cursor-pointer"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
+          </button>
+          <button
+            onClick={openAddModal}
+            className="px-4 py-2.5 bg-[#A81818] hover:bg-[#8F1313] text-white text-xs font-bold uppercase tracking-wider rounded-lg transition-colors cursor-pointer inline-flex items-center gap-1.5 shadow-xs"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Add Member</span>
+          </button>
         </div>
       </div>
 
-      {/* Add / Edit Member Modal */}
+      {/* Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {members.map((m) => (
+          <div
+            key={m.id}
+            className="bg-white p-6 rounded-xl border border-[#D5CEBC] shadow-xs flex flex-col justify-between"
+          >
+            <div>
+              <div className="flex items-start justify-between gap-2 mb-3">
+                <span
+                  className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded ${
+                    m.isModerator
+                      ? "bg-amber-100 text-amber-900 border border-amber-300"
+                      : "bg-[#F5F1E6] text-[#6E685E]"
+                  }`}
+                >
+                  {m.isModerator ? "Faculty Moderator" : m.panelYear || "Executive"}
+                </span>
+
+                <button
+                  onClick={() => toggleVisibility(m)}
+                  className={`px-2 py-0.5 rounded text-[10px] font-bold cursor-pointer ${
+                    m.isVisible !== false
+                      ? "bg-emerald-100 text-emerald-800"
+                      : "bg-neutral-200 text-neutral-600"
+                  }`}
+                >
+                  {m.isVisible !== false ? "Visible" : "Hidden"}
+                </button>
+              </div>
+
+              <h3 className="font-display font-bold text-base uppercase text-[#1A1614]">
+                {m.name}
+              </h3>
+              <div className="text-xs font-semibold text-[#A81818] mb-3">
+                {m.designation}
+              </div>
+
+              <div className="space-y-1 text-xs text-[#6E685E] border-t border-[#EFEADB] pt-2.5">
+                <div><strong>Phone:</strong> {m.phone || "N/A"}</div>
+                <div><strong>Email:</strong> {m.email || "N/A"}</div>
+              </div>
+            </div>
+
+            <div className="pt-3 border-t border-[#EFEADB] mt-4 flex items-center justify-between">
+              <a
+                href={m.facebookUrl || "#"}
+                target="_blank"
+                rel="noreferrer"
+                className="text-xs font-bold text-[#6E685E] hover:text-[#A81818]"
+              >
+                Profile Link &rarr;
+              </a>
+
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => openEditModal(m)}
+                  title="Edit Member"
+                  className="p-1.5 text-[#6E685E] hover:text-[#1A1614] hover:bg-[#EFEADB] rounded transition-colors cursor-pointer"
+                >
+                  <Pencil className="w-4 h-4" />
+                </button>
+                {!m.isModerator && (
+                  <button
+                    onClick={() => handleDelete(m.id)}
+                    title="Delete Member"
+                    className="p-1.5 text-rose-600 hover:bg-rose-50 rounded transition-colors cursor-pointer"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Modal */}
       <Modal
         open={isModalOpen}
         onCancel={() => setIsModalOpen(false)}
         footer={null}
-        width={560}
+        centered
         title={
-          <span className="font-display font-bold text-base uppercase text-[#1A1614]">
-            {editingMember ? "Update Executive Contact & Role" : "Add Executive Committee Member"}
+          <span className="font-display font-bold uppercase text-sm">
+            {editingMember ? "Edit Team Member" : "Add Executive / Moderator"}
           </span>
         }
       >
-        <form onSubmit={handleSave} className="space-y-4 pt-2 text-xs">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block font-bold text-[#1A1614] uppercase mb-1">
-                Full Name <span className="text-[#A81818]">*</span>
-              </label>
-              <input
-                type="text"
-                required
-                placeholder="e.g. Mirza Rafid Ahmed"
-                value={formState.name}
-                onChange={(e) => setFormState({ ...formState, name: e.target.value })}
-                className="w-full p-2.5 rounded border border-[#D5CEBC] bg-[#F5F1E6] text-xs font-medium"
-              />
-            </div>
+        <form onSubmit={handleSubmit} className="space-y-4 pt-2 text-xs">
+          <div>
+            <label className="block text-xs font-bold text-[#1A1614] mb-1">
+              Full Name <span className="text-[#A81818]">*</span>
+            </label>
+            <input
+              type="text"
+              required
+              placeholder="e.g. Mirza Rafid Ahmed"
+              value={formState.name}
+              onChange={(e) => setFormState({ ...formState, name: e.target.value })}
+              className="w-full px-3 py-2 border border-[#D5CEBC] rounded-lg text-xs"
+            />
+          </div>
 
+          <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block font-bold text-[#1A1614] uppercase mb-1">
-                Designation / Role <span className="text-[#A81818]">*</span>
-              </label>
+              <label className="block text-xs font-bold text-[#1A1614] mb-1">Designation</label>
               <input
                 type="text"
                 required
                 placeholder="e.g. General Secretary"
                 value={formState.designation}
                 onChange={(e) => setFormState({ ...formState, designation: e.target.value })}
-                className="w-full p-2.5 rounded border border-[#D5CEBC] bg-[#F5F1E6] text-xs font-medium"
+                className="w-full px-3 py-2 border border-[#D5CEBC] rounded-lg text-xs"
               />
             </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block font-bold text-[#1A1614] uppercase mb-1">
-                Phone Number
-              </label>
+              <label className="block text-xs font-bold text-[#1A1614] mb-1">Panel Year</label>
               <input
                 type="text"
-                placeholder="+880 1711-234567"
-                value={formState.phone}
-                onChange={(e) => setFormState({ ...formState, phone: e.target.value })}
-                className="w-full p-2.5 rounded border border-[#D5CEBC] bg-white text-xs font-mono"
-              />
-            </div>
-
-            <div>
-              <label className="block font-bold text-[#1A1614] uppercase mb-1">
-                Official Email
-              </label>
-              <input
-                type="email"
-                placeholder="rafid.ndcsdc@gmail.com"
-                value={formState.email}
-                onChange={(e) => setFormState({ ...formState, email: e.target.value })}
-                className="w-full p-2.5 rounded border border-[#D5CEBC] bg-white text-xs"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block font-bold text-[#1A1614] uppercase mb-1">
-                Facebook Profile Link
-              </label>
-              <input
-                type="url"
-                placeholder="https://facebook.com/username"
-                value={formState.facebookUrl}
-                onChange={(e) => setFormState({ ...formState, facebookUrl: e.target.value })}
-                className="w-full p-2.5 rounded border border-[#D5CEBC] bg-white text-xs"
-              />
-            </div>
-
-            <div>
-              <label className="block font-bold text-[#1A1614] uppercase mb-1">
-                Panel Year
-              </label>
-              <input
-                type="text"
-                required
                 placeholder="2025-26"
                 value={formState.panelYear}
                 onChange={(e) => setFormState({ ...formState, panelYear: e.target.value })}
-                className="w-full p-2.5 rounded border border-[#D5CEBC] bg-white text-xs font-medium"
+                className="w-full px-3 py-2 border border-[#D5CEBC] rounded-lg text-xs font-mono"
               />
             </div>
           </div>
 
-          <div className="pt-2">
-            <label className="inline-flex items-center gap-2 cursor-pointer">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-bold text-[#1A1614] mb-1">Phone</label>
+              <input
+                type="text"
+                placeholder="+880 17XXXXXXXX"
+                value={formState.phone}
+                onChange={(e) => setFormState({ ...formState, phone: e.target.value })}
+                className="w-full px-3 py-2 border border-[#D5CEBC] rounded-lg text-xs font-mono"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-[#1A1614] mb-1">Email</label>
+              <input
+                type="email"
+                placeholder="name@ndcsdc.org"
+                value={formState.email}
+                onChange={(e) => setFormState({ ...formState, email: e.target.value })}
+                className="w-full px-3 py-2 border border-[#D5CEBC] rounded-lg text-xs"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-[#1A1614] mb-1">Facebook / Social URL</label>
+            <input
+              type="url"
+              placeholder="https://facebook.com/..."
+              value={formState.facebookUrl}
+              onChange={(e) => setFormState({ ...formState, facebookUrl: e.target.value })}
+              className="w-full px-3 py-2 border border-[#D5CEBC] rounded-lg text-xs"
+            />
+          </div>
+
+          <div className="flex items-center gap-4 pt-1">
+            <label className="flex items-center gap-2 text-xs font-semibold cursor-pointer">
               <input
                 type="checkbox"
                 checked={formState.isModerator}
                 onChange={(e) => setFormState({ ...formState, isModerator: e.target.checked })}
-                className="w-4 h-4 rounded text-[#A81818]"
+                className="rounded"
               />
-              <span className="text-xs font-bold text-[#1A1614] uppercase">
-                Faculty Moderator Flag
-              </span>
+              <span>Faculty Moderator Role</span>
+            </label>
+            <label className="flex items-center gap-2 text-xs font-semibold cursor-pointer">
+              <input
+                type="checkbox"
+                checked={formState.isVisible}
+                onChange={(e) => setFormState({ ...formState, isVisible: e.target.checked })}
+                className="rounded"
+              />
+              <span>Visible on Website</span>
             </label>
           </div>
 
-          <div className="pt-3 border-t border-[#EFEADB] flex justify-end gap-2">
+          <div className="flex justify-end gap-2 pt-2">
             <button
               type="button"
               onClick={() => setIsModalOpen(false)}
-              className="px-4 py-2 border border-[#D5CEBC] rounded text-xs font-bold uppercase cursor-pointer"
+              className="px-4 py-2 border border-[#D5CEBC] rounded-lg text-xs font-bold"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="btn-primary px-5 py-2 text-xs uppercase font-bold cursor-pointer"
+              className="px-4 py-2 bg-[#A81818] text-white rounded-lg text-xs font-bold uppercase tracking-wider"
             >
-              {editingMember ? "Update Member" : "Save Member"}
+              {editingMember ? "Update Member" : "Add Member"}
             </button>
           </div>
         </form>
       </Modal>
-
     </div>
   );
 }

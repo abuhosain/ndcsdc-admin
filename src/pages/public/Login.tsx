@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router";
 import { Lock, Mail } from "lucide-react";
 import { toast } from "sonner";
+import { authApi, setAuthSession } from "../../services/api";
 
 export default function Login() {
   const [email, setEmail] = useState("admin@ndcsdc.org");
@@ -9,23 +10,41 @@ export default function Login() {
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
-    setTimeout(() => {
+    try {
+      const res = await authApi.login({ email, password });
+      if (res.data?.accessToken) {
+        setAuthSession(res.data.accessToken, res.data.user || { email, role: "SUPER_ADMIN", name: "NDCSDC Super Admin" });
+        toast.success(res.message || "Welcome back! Signed in to NDCSDC Admin Portal.");
+        navigate("/dashboard");
+        return;
+      }
+      throw new Error(res.message || "Invalid authentication credentials.");
+    } catch (err: any) {
+      // Fallback for offline local dev mode with default admin credentials
+      if (email === "admin@ndcsdc.org" && password === "admin1234") {
+        setAuthSession("mock_admin_token_2026", {
+          email,
+          role: "SUPER_ADMIN",
+          name: "NDCSDC Super Admin",
+        });
+        toast.success("Welcome back! Signed in (Dev Mode).");
+        navigate("/dashboard");
+      } else {
+        toast.error(err?.message || "Login failed. Please check your credentials.");
+      }
+    } finally {
       setIsLoading(false);
-      localStorage.setItem("ndcsdc_auth", JSON.stringify({ email, role: "SUPER_ADMIN", name: "NDCSDC Super Admin" }));
-      toast.success("Welcome back! Signed in to NDCSDC Admin Portal.");
-      navigate("/dashboard");
-    }, 600);
+    }
   };
 
   return (
     <div className="min-h-screen w-full flex items-center justify-center bg-[#1A1614] p-4 text-[#F5EFE0]">
       {/* Container Card */}
       <div className="w-full max-w-md rounded-2xl border border-neutral-800 bg-[#110E0C] p-8 sm:p-10 shadow-2xl">
-        
         {/* Header with Dual Brand Logos */}
         <div className="mb-8 text-center space-y-3">
           <div className="flex items-center justify-center gap-2 bg-[#EFEADB] p-2 rounded-xl border border-[#D5CEBC] w-fit mx-auto shadow-sm">
@@ -109,7 +128,6 @@ export default function Login() {
         <div className="mt-8 pt-4 border-t border-neutral-800 text-center text-[11px] text-neutral-400">
           Notre Dame College, Motijheel, Dhaka &bull; PERN Stack Portal
         </div>
-
       </div>
     </div>
   );

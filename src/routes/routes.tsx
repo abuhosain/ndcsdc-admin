@@ -13,6 +13,10 @@ import PartnersAdminPage from "../pages/dashboard/PartnersAdminPage";
 import MessagesAdminPage from "../pages/dashboard/MessagesAdminPage";
 import SiteSettingsAdminPage from "../pages/dashboard/SiteSettingsAdminPage";
 import UsersAuditAdminPage from "../pages/dashboard/UsersAuditAdminPage";
+import AchievementsAdminPage from "../pages/dashboard/AchievementsAdminPage";
+import NewsAdminPage from "../pages/dashboard/NewsAdminPage";
+import ResourcesAdminPage from "../pages/dashboard/ResourcesAdminPage";
+import AlumniAdminPage from "../pages/dashboard/AlumniAdminPage";
 
 const router = createBrowserRouter([
   {
@@ -42,6 +46,22 @@ const router = createBrowserRouter([
       {
         path: "/dashboard/activities",
         element: <ActivitiesAdminPage />,
+      },
+      {
+        path: "/dashboard/achievements",
+        element: <AchievementsAdminPage />,
+      },
+      {
+        path: "/dashboard/news",
+        element: <NewsAdminPage />,
+      },
+      {
+        path: "/dashboard/resources",
+        element: <ResourcesAdminPage />,
+      },
+      {
+        path: "/dashboard/alumni",
+        element: <AlumniAdminPage />,
       },
       {
         path: "/dashboard/gallery",

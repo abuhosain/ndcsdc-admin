@@ -14,60 +14,85 @@ import {
   ChevronLeft,
   ChevronRight,
   ExternalLink,
+  Award,
+  Newspaper,
+  BookOpen,
+  GraduationCap,
 } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router";
+import { authApi } from "../../services/api";
 
 const { Sider } = Layout;
 
 const sidebarItems = [
   {
     key: "/dashboard",
-    label: <Link to="/dashboard" className="text-sm font-semibold">Dashboard</Link>,
+    label: <Link to="/dashboard" className="text-xs font-semibold">Dashboard</Link>,
     icon: <LayoutDashboard className="w-4 h-4" />,
   },
   {
     key: "/dashboard/registrations",
-    label: <Link to="/dashboard/registrations" className="text-sm font-semibold">Registrations</Link>,
+    label: <Link to="/dashboard/registrations" className="text-xs font-semibold">Registrations</Link>,
     icon: <UserCheck className="w-4 h-4" />,
   },
   {
     key: "/dashboard/summit",
-    label: <Link to="/dashboard/summit" className="text-sm font-semibold">Summit NACS 2026</Link>,
+    label: <Link to="/dashboard/summit" className="text-xs font-semibold">Summit NACS 2026</Link>,
     icon: <Calendar className="w-4 h-4" />,
   },
   {
     key: "/dashboard/activities",
-    label: <Link to="/dashboard/activities" className="text-sm font-semibold">Activities</Link>,
+    label: <Link to="/dashboard/activities" className="text-xs font-semibold">Events & Activities</Link>,
     icon: <Layers className="w-4 h-4" />,
   },
   {
+    key: "/dashboard/achievements",
+    label: <Link to="/dashboard/achievements" className="text-xs font-semibold">Achievements & Impact</Link>,
+    icon: <Award className="w-4 h-4" />,
+  },
+  {
+    key: "/dashboard/news",
+    label: <Link to="/dashboard/news" className="text-xs font-semibold">News & Notices</Link>,
+    icon: <Newspaper className="w-4 h-4" />,
+  },
+  {
+    key: "/dashboard/resources",
+    label: <Link to="/dashboard/resources" className="text-xs font-semibold">Resources & Guides</Link>,
+    icon: <BookOpen className="w-4 h-4" />,
+  },
+  {
+    key: "/dashboard/alumni",
+    label: <Link to="/dashboard/alumni" className="text-xs font-semibold">Alumni & Moderation</Link>,
+    icon: <GraduationCap className="w-4 h-4" />,
+  },
+  {
     key: "/dashboard/gallery",
-    label: <Link to="/dashboard/gallery" className="text-sm font-semibold">Photo Gallery</Link>,
+    label: <Link to="/dashboard/gallery" className="text-xs font-semibold">Photo Gallery</Link>,
     icon: <ImageIcon className="w-4 h-4" />,
   },
   {
     key: "/dashboard/team",
-    label: <Link to="/dashboard/team" className="text-sm font-semibold">Executive Team</Link>,
+    label: <Link to="/dashboard/team" className="text-xs font-semibold">Panels & Committee</Link>,
     icon: <Users className="w-4 h-4" />,
   },
   {
     key: "/dashboard/partners",
-    label: <Link to="/dashboard/partners" className="text-sm font-semibold">Partners & Sponsors</Link>,
+    label: <Link to="/dashboard/partners" className="text-xs font-semibold">Partners & Sponsors</Link>,
     icon: <Handshake className="w-4 h-4" />,
   },
   {
     key: "/dashboard/messages",
-    label: <Link to="/dashboard/messages" className="text-sm font-semibold">Messages Inbox</Link>,
+    label: <Link to="/dashboard/messages" className="text-xs font-semibold">Messages Inbox</Link>,
     icon: <Mail className="w-4 h-4" />,
   },
   {
     key: "/dashboard/settings",
-    label: <Link to="/dashboard/settings" className="text-sm font-semibold">Site Settings</Link>,
+    label: <Link to="/dashboard/settings" className="text-xs font-semibold">Site Settings</Link>,
     icon: <Settings className="w-4 h-4" />,
   },
   {
     key: "/dashboard/users",
-    label: <Link to="/dashboard/users" className="text-sm font-semibold">Admin Users & Audit</Link>,
+    label: <Link to="/dashboard/users" className="text-xs font-semibold">Admin Users & Audit</Link>,
     icon: <ShieldAlert className="w-4 h-4" />,
   },
 ];
@@ -82,8 +107,13 @@ export default function Sidebar({
   const location = useLocation();
   const navigate = useNavigate();
 
-  const handleLogout = () => {
-    localStorage.removeItem("ndcsdc_auth");
+  const handleLogout = async () => {
+    try {
+      await authApi.logout();
+    } catch {
+      localStorage.removeItem("ndcsdc_auth");
+      localStorage.removeItem("ndcsdc_token");
+    }
     navigate("/login");
   };
 
@@ -119,7 +149,7 @@ export default function Sidebar({
                   NDCSDC Admin
                 </span>
                 <span className="text-[10px] text-neutral-400 font-medium">
-                  NACS 2026 Portal
+                  Club Portal Management
                 </span>
               </div>
             )}
@@ -144,7 +174,7 @@ export default function Sidebar({
               borderRight: 0,
               background: "transparent",
             }}
-            className="border-none space-y-1"
+            className="border-none space-y-0.5 text-xs"
           />
         </div>
 
