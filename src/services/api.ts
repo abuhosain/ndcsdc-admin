@@ -197,6 +197,9 @@ export const activitiesApi = {
   getAdminActivities: async () => {
     return request<any[]>("/activities/admin/all");
   },
+  getPublicActivities: async () => {
+    return request<any[]>("/activities");
+  },
   createActivity: async (payload: any) => {
     return request("/activities/admin", {
       method: "POST",

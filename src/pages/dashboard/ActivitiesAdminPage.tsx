@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Plus, Trash2, Pencil, RefreshCw } from "lucide-react";
+import { Plus, Trash2, Pencil, RefreshCw, Star } from "lucide-react";
 import { Modal } from "antd";
 import { toast } from "sonner";
 import { activitiesApi } from "../../services/api";
@@ -7,49 +7,34 @@ import { activitiesApi } from "../../services/api";
 interface Activity {
   id: string;
   title: string;
+  slug?: string;
   category: string;
+  date?: string;
   eventDate?: string;
+  venue?: string;
   summary?: string;
+  isUpcoming?: boolean;
+  isFeatured?: boolean;
+  eventStatus?: "OPEN" | "CLOSING_SOON" | "FULL" | "CLOSED";
+  registrationUrl?: string;
   status: "PUBLISHED" | "DRAFT" | "ARCHIVED";
 }
 
-const INITIAL_ACTIVITIES: Activity[] = [
-  {
-    id: "1",
-    title: "National Academic Career Fair & Study Expo",
-    category: "Study Fair",
-    eventDate: "2025-11-15",
-    summary: "Flagship multi-faculty fair connecting 800+ college students with university representatives and mock aptitude drills.",
-    status: "PUBLISHED",
-  },
-  {
-    id: "2",
-    title: "IBA & BUP Analytical Problem Solving Workshop",
-    category: "Masterclass",
-    eventDate: "2026-01-20",
-    summary: "Intensive workshop focused on quantitative shortcuts, critical reading heuristics, and mock viva evaluations.",
-    status: "PUBLISHED",
-  },
-  {
-    id: "3",
-    title: "BUET & Engineering Physics Numerical Boot Camp",
-    category: "Bootcamp",
-    eventDate: "2026-03-10",
-    summary: "Deep-dive technical session breaking down high-yield calculus, thermodynamics, and electromagnetism problem-solving.",
-    status: "PUBLISHED",
-  },
-];
-
 export default function ActivitiesAdminPage() {
-  const [activities, setActivities] = useState<Activity[]>(INITIAL_ACTIVITIES);
+  const [activities, setActivities] = useState<Activity[]>([]);
   const [loading, setLoading] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingActivity, setEditingActivity] = useState<Activity | null>(null);
 
   const [formState, setFormState] = useState({
     title: "",
-    category: "Study Fair",
+    category: "Workshop",
     eventDate: "",
+    venue: "Notre Dame College Campus, Dhaka",
+    isUpcoming: true,
+    isFeatured: false,
+    eventStatus: "OPEN" as "OPEN" | "CLOSING_SOON" | "FULL" | "CLOSED",
+    registrationUrl: "",
     summary: "",
     status: "PUBLISHED" as "PUBLISHED" | "DRAFT",
   });
@@ -57,12 +42,29 @@ export default function ActivitiesAdminPage() {
   const loadActivities = async () => {
     try {
       setLoading(true);
-      const res = await activitiesApi.getAdminActivities();
-      if (res.data && res.data.length > 0) {
-        setActivities(res.data);
+      let list: Activity[] = [];
+      try {
+        const res = await activitiesApi.getAdminActivities();
+        if (res?.data && Array.isArray(res.data) && res.data.length > 0) {
+          list = res.data;
+        }
+      } catch {
+        // Fallback to public activities endpoint if admin token not present
+        const pubRes = await activitiesApi.getPublicActivities();
+        if (pubRes?.data && Array.isArray(pubRes.data)) {
+          list = pubRes.data;
+        }
       }
-    } catch {
-      // Keep initial
+
+      if (list.length > 0) {
+        const mapped = list.map((item: any) => ({
+          ...item,
+          eventDate: item.date ? item.date.slice(0, 10) : item.eventDate || "",
+        }));
+        setActivities(mapped);
+      }
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to load activities.");
     } finally {
       setLoading(false);
     }
@@ -76,8 +78,13 @@ export default function ActivitiesAdminPage() {
     setEditingActivity(null);
     setFormState({
       title: "",
-      category: "Study Fair",
+      category: "Workshop",
       eventDate: new Date().toISOString().slice(0, 10),
+      venue: "Notre Dame College Campus, Dhaka",
+      isUpcoming: true,
+      isFeatured: false,
+      eventStatus: "OPEN",
+      registrationUrl: "",
       summary: "",
       status: "PUBLISHED",
     });
@@ -86,14 +93,43 @@ export default function ActivitiesAdminPage() {
 
   const openEditModal = (act: Activity) => {
     setEditingActivity(act);
+    const dateVal = act.eventDate || (act.date ? act.date.slice(0, 10) : "");
     setFormState({
       title: act.title,
       category: act.category,
-      eventDate: act.eventDate ? act.eventDate.slice(0, 10) : "",
+      eventDate: dateVal,
+      venue: act.venue || "Notre Dame College Campus, Dhaka",
+      isUpcoming: act.isUpcoming ?? true,
+      isFeatured: act.isFeatured ?? false,
+      eventStatus: act.eventStatus || "OPEN",
+      registrationUrl: act.registrationUrl || "",
       summary: act.summary || "",
       status: act.status === "DRAFT" ? "DRAFT" : "PUBLISHED",
     });
     setIsModalOpen(true);
+  };
+
+  const toggleFeatured = async (act: Activity) => {
+    const nextFeatured = !act.isFeatured;
+    try {
+      await activitiesApi.updateActivity(act.id, { isFeatured: nextFeatured });
+      setActivities((prev) =>
+        prev.map((item) => {
+          if (item.id === act.id) {
+            return { ...item, isFeatured: nextFeatured };
+          }
+          // If setting one as featured, unset all others
+          return nextFeatured ? { ...item, isFeatured: false } : item;
+        })
+      );
+      toast.success(
+        nextFeatured
+          ? `"${act.title}" is now the Homepage Spotlight Event.`
+          : `Removed spotlight from "${act.title}".`
+      );
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to update spotlight status in database.");
+    }
   };
 
   const toggleStatus = async (act: Activity) => {
@@ -104,11 +140,8 @@ export default function ActivitiesAdminPage() {
         prev.map((item) => (item.id === act.id ? { ...item, status: nextStatus } : item))
       );
       toast.success(`Activity status changed to ${nextStatus}.`);
-    } catch {
-      setActivities((prev) =>
-        prev.map((item) => (item.id === act.id ? { ...item, status: nextStatus } : item))
-      );
-      toast.success(`Activity status changed to ${nextStatus} (Local).`);
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to update status.");
     }
   };
 
@@ -116,10 +149,9 @@ export default function ActivitiesAdminPage() {
     try {
       await activitiesApi.deleteActivity(id);
       setActivities((prev) => prev.filter((item) => item.id !== id));
-      toast.success("Activity deleted.");
-    } catch {
-      setActivities((prev) => prev.filter((item) => item.id !== id));
-      toast.success("Activity deleted (Local).");
+      toast.success("Activity deleted successfully.");
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to delete activity.");
     }
   };
 
@@ -131,32 +163,25 @@ export default function ActivitiesAdminPage() {
     }
 
     try {
+      const payload = {
+        ...formState,
+        date: formState.eventDate,
+      };
+
       if (editingActivity) {
-        await activitiesApi.updateActivity(editingActivity.id, formState);
-        setActivities((prev) =>
-          prev.map((a) => (a.id === editingActivity.id ? { ...a, ...formState } : a))
-        );
+        await activitiesApi.updateActivity(editingActivity.id, payload);
         toast.success("Activity updated successfully.");
       } else {
-        const res = await activitiesApi.createActivity({
-          ...formState,
+        await activitiesApi.createActivity({
+          ...payload,
           slug: formState.title.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
         });
-        const created = res.data || { id: String(Date.now()), ...formState };
-        setActivities((prev) => [created, ...prev]);
         toast.success("New activity published.");
       }
-    } catch {
-      if (editingActivity) {
-        setActivities((prev) =>
-          prev.map((a) => (a.id === editingActivity.id ? { ...a, ...formState } : a))
-        );
-      } else {
-        setActivities((prev) => [{ id: String(Date.now()), ...formState }, ...prev]);
-      }
-      toast.success("Activity saved (Local).");
-    } finally {
       setIsModalOpen(false);
+      await loadActivities();
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to save activity.");
     }
   };
 
@@ -200,9 +225,21 @@ export default function ActivitiesAdminPage() {
           >
             <div>
               <div className="flex items-start justify-between gap-2 mb-3">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-[#A81818] bg-rose-50 px-2.5 py-0.5 rounded">
-                  {act.category}
-                </span>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-[#A81818] bg-rose-50 px-2.5 py-0.5 rounded">
+                    {act.category}
+                  </span>
+                  {act.isFeatured && (
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-amber-900 bg-amber-100 border border-amber-300 px-2 py-0.5 rounded flex items-center gap-1">
+                      ⭐ Spotlight
+                    </span>
+                  )}
+                  {act.isUpcoming && (
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-800 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded">
+                      Upcoming
+                    </span>
+                  )}
+                </div>
                 <span className="font-mono text-xs text-[#6E685E]">
                   {act.eventDate ? act.eventDate.slice(0, 10) : "Recent"}
                 </span>
@@ -217,18 +254,31 @@ export default function ActivitiesAdminPage() {
             </div>
 
             <div className="pt-4 border-t border-[#EFEADB] mt-4 flex items-center justify-between">
-              <button
-                onClick={() => toggleStatus(act)}
-                className={`px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wider cursor-pointer ${
-                  act.status === "PUBLISHED"
-                    ? "bg-emerald-100 text-emerald-800"
-                    : "bg-amber-100 text-amber-800"
-                }`}
-              >
-                {act.status}
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => toggleStatus(act)}
+                  className={`px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wider cursor-pointer ${
+                    act.status === "PUBLISHED"
+                      ? "bg-emerald-100 text-emerald-800"
+                      : "bg-amber-100 text-amber-800"
+                  }`}
+                >
+                  {act.status}
+                </button>
+              </div>
 
               <div className="flex items-center gap-1">
+                <button
+                  onClick={() => toggleFeatured(act)}
+                  title={act.isFeatured ? "Remove from Homepage Spotlight" : "Set as Homepage Spotlight Event"}
+                  className={`p-1.5 rounded transition-colors cursor-pointer ${
+                    act.isFeatured
+                      ? "text-amber-600 bg-amber-50 hover:bg-amber-100"
+                      : "text-[#6E685E] hover:text-amber-600 hover:bg-[#EFEADB]"
+                  }`}
+                >
+                  <Star className={`w-4 h-4 ${act.isFeatured ? "fill-amber-500 text-amber-500" : ""}`} />
+                </button>
                 <button
                   onClick={() => openEditModal(act)}
                   title="Edit Activity"
@@ -303,15 +353,86 @@ export default function ActivitiesAdminPage() {
             </div>
           </div>
 
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-bold text-[#1A1614] mb-1">Campus Venue / Location</label>
+              <input
+                type="text"
+                placeholder="e.g. Auditorium Hall B"
+                value={formState.venue}
+                onChange={(e) => setFormState({ ...formState, venue: e.target.value })}
+                className="w-full px-3 py-2 border border-[#D5CEBC] rounded-lg text-xs"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-[#1A1614] mb-1">Event Timeframe</label>
+              <select
+                value={formState.isUpcoming ? "UPCOMING" : "PAST"}
+                onChange={(e) => setFormState({ ...formState, isUpcoming: e.target.value === "UPCOMING" })}
+                className="w-full px-3 py-2 border border-[#D5CEBC] rounded-lg text-xs cursor-pointer font-bold"
+              >
+                <option value="UPCOMING">Upcoming Event (Active Listings)</option>
+                <option value="PAST">Past Activity (Archived Archive)</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 bg-[#FAF8F5] p-3 rounded-lg border border-[#EFEADB]">
+            <div>
+              <label className="block text-xs font-bold text-[#1A1614] mb-1">Registration Status</label>
+              <select
+                value={formState.eventStatus}
+                onChange={(e) => setFormState({ ...formState, eventStatus: e.target.value as any })}
+                className="w-full px-3 py-2 border border-[#D5CEBC] rounded-lg text-xs cursor-pointer font-bold"
+              >
+                <option value="OPEN">OPEN (Accepting Registrations)</option>
+                <option value="CLOSING_SOON">CLOSING SOON (Last Few Seats)</option>
+                <option value="FULL">FULL (Capacity Reached)</option>
+                <option value="CLOSED">CLOSED</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-[#1A1614] mb-1">Dedicated Registration URL</label>
+              <input
+                type="text"
+                placeholder="e.g. /summit/register or Google Form link"
+                value={formState.registrationUrl}
+                onChange={(e) => setFormState({ ...formState, registrationUrl: e.target.value })}
+                className="w-full px-3 py-2 border border-[#D5CEBC] rounded-lg text-xs font-mono"
+              />
+            </div>
+          </div>
+
           <div>
             <label className="block text-xs font-bold text-[#1A1614] mb-1">Summary / Brief Description</label>
             <textarea
-              rows={4}
+              rows={3}
               value={formState.summary}
               onChange={(e) => setFormState({ ...formState, summary: e.target.value })}
               placeholder="Highlight what will be covered in this session..."
               className="w-full p-3 border border-[#D5CEBC] rounded-lg text-xs"
             ></textarea>
+          </div>
+
+          {/* Spotlight on Homepage Toggle */}
+          <div className="flex items-center justify-between p-3 rounded-lg border border-amber-200 bg-amber-50/70">
+            <div>
+              <span className="block text-xs font-bold text-amber-950">
+                ⭐ Feature as Homepage Spotlight Event
+              </span>
+              <span className="block text-[11px] text-amber-800/80">
+                Shows this event in the prominent banner on the website homepage. (Only 1 event can be spotlighted).
+              </span>
+            </div>
+            <input
+              type="checkbox"
+              id="isFeaturedToggle"
+              checked={formState.isFeatured}
+              onChange={(e) => setFormState({ ...formState, isFeatured: e.target.checked })}
+              className="w-4 h-4 text-[#A81818] rounded cursor-pointer accent-[#A81818]"
+            />
           </div>
 
           <div>
